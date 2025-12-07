@@ -818,11 +818,14 @@ def user_competition():
 def create_selection():
     """API to create user team selection"""
     data = request.json
-    user_name = data.get('user_name')
+    user_name = data.get('user_name', '').strip()
     team_ids = data.get('team_ids', [])
     
     if not user_name:
         return jsonify({'success': False, 'message': 'User name required'}), 400
+    
+    if len(user_name) > 20:
+        return jsonify({'success': False, 'message': 'Name must be 20 characters or less'}), 400
     
     if len(team_ids) < 3 or len(team_ids) > 4:
         return jsonify({'success': False, 'message': 'Select 3-4 teams'}), 400
@@ -972,16 +975,68 @@ def api_match_history():
 # INITIALIZATION
 # ----------------------------------------------------
 
+def check_and_migrate_db():
+    """Check if database schema needs updating and migrate if necessary"""
+    with app.app_context():
+        # Check if 'group' column exists in team table
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('team')]
+            
+            if 'group' not in columns:
+                print("Database schema outdated - adding 'group' column...")
+                # Add the group column
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('ALTER TABLE team ADD COLUMN "group" VARCHAR(1)'))
+                    conn.commit()
+                print("Migration complete!")
+                
+                # Update existing teams with group data from CSV
+                update_team_groups()
+                
+        except Exception as e:
+            # Table might not exist yet, that's fine
+            print(f"Migration check: {e}")
+
+def update_team_groups():
+    """Update existing teams with group data from CSV"""
+    with app.app_context():
+        try:
+            qualified_df = pd.read_csv('data/qualified.csv')
+            for _, row in qualified_df.iterrows():
+                team = Team.query.filter_by(country=row['Country']).first()
+                if team and 'Group' in row:
+                    team.group = row['Group']
+            db.session.commit()
+            print("Team groups updated from CSV!")
+        except Exception as e:
+            print(f"Error updating groups: {e}")
+
 def init_db():
     """Initialize database"""
     with app.app_context():
         db.create_all()
+        
+        # Run migrations if needed
+        check_and_migrate_db()
+        
         # Check if teams exist
-        if Team.query.count() == 0:
+        try:
+            count = Team.query.count()
+            if count == 0:
+                initialize_teams()
+                print("Database initialized with teams!")
+        except Exception as e:
+            # If there's still an error, drop and recreate
+            print(f"Database error, recreating: {e}")
+            db.drop_all()
+            db.create_all()
             initialize_teams()
-            print("Database initialized with teams!")
+            print("Database recreated with teams!")
 
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
