@@ -2,18 +2,32 @@
 
 {% block title %}Team Selector - World Cup 2026 Scorer{% endblock %}
 
+{% macro flag(team, size='') %}
+<img src="https://flagcdn.com/w40/{{ team.flag_code }}.png" 
+     srcset="https://flagcdn.com/w80/{{ team.flag_code }}.png 2x"
+     class="flag {{ size }}" 
+     alt="{{ team.country }} flag">
+{% endmacro %}
+
 {% block extra_css %}
 <style>
-    .team-selector {
+    .group-section {
+        margin-bottom: 1.5rem;
+    }
+    
+    .group-header {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.3rem;
+        color: var(--accent-gold);
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border);
+    }
+    
+    .group-teams {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         gap: 0.5rem;
-        max-height: 400px;
-        overflow-y: auto;
-        padding: 1rem;
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 8px;
-        margin-bottom: 1rem;
     }
     
     .team-option {
@@ -51,6 +65,7 @@
         justify-content: center;
         color: transparent;
         transition: all 0.2s ease;
+        flex-shrink: 0;
     }
     
     .team-option.selected .checkmark {
@@ -59,10 +74,30 @@
         color: white;
     }
     
+    .team-option .team-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex: 1;
+    }
+    
+    .team-option .team-points {
+        font-family: 'Bebas Neue', sans-serif;
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        margin-left: auto;
+    }
+    
     .selection-count {
         font-family: 'Bebas Neue', sans-serif;
         font-size: 1.5rem;
         color: var(--accent-gold);
+    }
+    
+    .teams-scroll-container {
+        max-height: 500px;
+        overflow-y: auto;
+        padding-right: 0.5rem;
     }
     
     .user-card {
@@ -113,6 +148,10 @@
         gap: 0.5rem;
     }
     
+    .user-team-badge.eliminated {
+        opacity: 0.6;
+    }
+    
     .user-team-badge .team-score {
         font-family: 'Bebas Neue', sans-serif;
         color: var(--accent-gold);
@@ -146,17 +185,28 @@
             </div>
             
             <label class="form-label">Select 3-4 Teams</label>
-            <div class="team-selector" id="teamSelector">
-                {% for team in all_teams %}
-                <label class="team-option" data-team-id="{{ team.id }}">
-                    <input type="checkbox" name="teams" value="{{ team.id }}">
-                    <span class="checkmark">✓</span>
-                    <span>{{ team.country }}</span>
-                </label>
+            <div class="teams-scroll-container">
+                {% for group in sorted_groups %}
+                <div class="group-section">
+                    <div class="group-header">Group {{ group }}</div>
+                    <div class="group-teams">
+                        {% for team in teams_by_group[group] %}
+                        <label class="team-option" data-team-id="{{ team.id }}">
+                            <input type="checkbox" name="teams" value="{{ team.id }}">
+                            <span class="checkmark">✓</span>
+                            <span class="team-info">
+                                {{ flag(team, 'flag-sm') }}
+                                <span>{{ team.country }}</span>
+                            </span>
+                            <span class="team-points">{{ team.base_points }}pts</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
                 {% endfor %}
             </div>
             
-            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 1rem;">
                 Submit Selection
             </button>
         </form>
@@ -185,6 +235,7 @@
                     <div class="user-teams">
                         {% for team in sel.teams %}
                         <span class="user-team-badge {% if team.eliminated %}eliminated{% endif %}">
+                            {{ flag(team, 'flag-sm') }}
                             {{ team.country }}
                             <span class="team-score">{{ "%.1f"|format(team.total_score) }}</span>
                         </span>
@@ -214,7 +265,7 @@
             <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; margin-top: 1rem;">
                 <p style="color: var(--accent-gold); font-weight: 600; margin-bottom: 0.5rem;">💡 Strategy Tip</p>
                 <p style="color: var(--text-secondary); font-size: 0.9rem;">
-                    Balance between favorites (likely to win but worth fewer points) and underdogs (hard to win but worth more when they do).
+                    Balance between favorites (likely to win but worth fewer points) and underdogs (hard to win but worth more when they do). The "pts" shown is each team's starting value.
                 </p>
             </div>
         </div>

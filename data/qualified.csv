@@ -1,43 +1,43 @@
-Country,Confederation,Qualification_Status
-United States,CONCACAF,Host
-Canada,CONCACAF,Host
-Mexico,CONCACAF,Host
-Argentina,CONMEBOL,Qualified
-Brazil,CONMEBOL,Qualified
-Uruguay,CONMEBOL,Qualified
-Colombia,CONMEBOL,Qualified
-Ecuador,CONMEBOL,Qualified
-Paraguay,CONMEBOL,Qualified
-Spain,UEFA,Qualified
-England,UEFA,Qualified
-France,UEFA,Qualified
-Germany,UEFA,Qualified
-Portugal,UEFA,Qualified
-Netherlands,UEFA,Qualified
-Belgium,UEFA,Qualified
-Switzerland,UEFA,Qualified
-Croatia,UEFA,Qualified
-Austria,UEFA,Qualified
-Norway,UEFA,Qualified
-Scotland,UEFA,Qualified
-Japan,AFC,Qualified
-Australia,AFC,Qualified
-Iran,AFC,Qualified
-South Korea,AFC,Qualified
-Saudi Arabia,AFC,Qualified
-Qatar,AFC,Qualified
-Jordan,AFC,Qualified
-Uzbekistan,AFC,Qualified
-Morocco,CAF,Qualified
-Senegal,CAF,Qualified
-Egypt,CAF,Qualified
-Algeria,CAF,Qualified
-Tunisia,CAF,Qualified
-Côte d'Ivoire,CAF,Qualified
-South Africa,CAF,Qualified
-Ghana,CAF,Qualified
-Cabo Verde,CAF,Qualified
-Panama,CONCACAF,Qualified
-Curacao,CONCACAF,Qualified
-Haiti,CONCACAF,Qualified
-New Zealand,OFC,Qualified
+Country,Confederation,Qualification_Status,Group
+United States,CONCACAF,Host,D
+Canada,CONCACAF,Host,B
+Mexico,CONCACAF,Host,C
+Argentina,CONMEBOL,Qualified,J
+Brazil,CONMEBOL,Qualified,C
+Uruguay,CONMEBOL,Qualified,H
+Colombia,CONMEBOL,Qualified,K
+Ecuador,CONMEBOL,Qualified,E
+Paraguay,CONMEBOL,Qualified,D
+Spain,UEFA,Qualified,H
+England,UEFA,Qualified,L
+France,UEFA,Qualified,I
+Germany,UEFA,Qualified,E
+Portugal,UEFA,Qualified,K
+Netherlands,UEFA,Qualified,F
+Belgium,UEFA,Qualified,G
+Switzerland,UEFA,Qualified,B
+Croatia,UEFA,Qualified,L
+Austria,UEFA,Qualified,J
+Norway,UEFA,Qualified,I
+Scotland,UEFA,Qualified,C
+Japan,AFC,Qualified,F
+Australia,AFC,Qualified,D
+Iran,AFC,Qualified,G
+South Korea,AFC,Qualified,A
+Saudi Arabia,AFC,Qualified,H
+Qatar,AFC,Qualified,B
+Jordan,AFC,Qualified,J
+Uzbekistan,AFC,Qualified,K
+Morocco,CAF,Qualified,C
+Senegal,CAF,Qualified,I
+Egypt,CAF,Qualified,G
+Algeria,CAF,Qualified,J
+Tunisia,CAF,Qualified,F
+Côte d'Ivoire,CAF,Qualified,E
+South Africa,CAF,Qualified,A
+Ghana,CAF,Qualified,L
+Cabo Verde,CAF,Qualified,H
+Panama,CONCACAF,Qualified,L
+Curacao,CONCACAF,Qualified,E
+Haiti,CONCACAF,Qualified,C
+New Zealand,OFC,Qualified,G

@@ -51,7 +51,12 @@
                 <tr class="{% if team.eliminated %}eliminated{% endif %}">
                     <td class="rank">{{ loop.index }}</td>
                     <td class="country">
-                        <a href="{{ url_for('team_detail', country=team.country) }}">{{ team.country }}</a>
+                        <span class="team-with-flag">
+                            <img src="https://flagcdn.com/24x18/{{ team.flag_code }}.png" 
+                                 srcset="https://flagcdn.com/48x36/{{ team.flag_code }}.png 2x"
+                                 class="flag" alt="{{ team.country }}">
+                            <a href="{{ url_for('team_detail', country=team.country) }}">{{ team.country }}</a>
+                        </span>
                         <span class="conf-badge conf-{{ team.confederation }}">{{ team.confederation }}</span>
                     </td>
                     <td class="score">{{ "%.1f"|format(team.total_score) }}</td>

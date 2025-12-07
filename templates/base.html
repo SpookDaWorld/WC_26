@@ -35,6 +35,32 @@
             box-sizing: border-box;
         }
 
+        /* Country Flags */
+        .flag {
+            width: 24px;
+            height: 18px;
+            border-radius: 2px;
+            object-fit: cover;
+            vertical-align: middle;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        
+        .flag-sm {
+            width: 20px;
+            height: 15px;
+        }
+        
+        .flag-lg {
+            width: 32px;
+            height: 24px;
+        }
+        
+        .team-with-flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
         body {
             font-family: 'Outfit', sans-serif;
             background: var(--gradient-main);

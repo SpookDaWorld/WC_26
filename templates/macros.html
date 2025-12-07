@@ -1,0 +1,18 @@
+{% macro flag(team, size='') %}
+<img src="https://flagcdn.com/w40/{{ team.flag_code }}.png" 
+     srcset="https://flagcdn.com/w80/{{ team.flag_code }}.png 2x"
+     class="flag {{ size }}" 
+     alt="{{ team.country }} flag"
+     loading="lazy">
+{% endmacro %}
+
+{% macro team_with_flag(team, size='', link=true) %}
+<span class="team-with-flag">
+    {{ flag(team, size) }}
+    {% if link %}
+    <a href="{{ url_for('team_detail', country=team.country) }}">{{ team.country }}</a>
+    {% else %}
+    <span>{{ team.country }}</span>
+    {% endif %}
+</span>
+{% endmacro %}

@@ -65,6 +65,7 @@ class Team(db.Model):
     fifa_rank = db.Column(db.Integer)
     tournament_rank = db.Column(db.Integer)
     confederation = db.Column(db.String(20))
+    group = db.Column(db.String(1))  # Group A-L
     base_points = db.Column(db.Integer)
     current_points = db.Column(db.Integer)
     total_score = db.Column(db.Float, default=0.0)
@@ -74,6 +75,55 @@ class Team(db.Model):
     eliminated = db.Column(db.Boolean, default=False)
     elimination_round = db.Column(db.String(50), default='')
     
+    @property
+    def flag_code(self):
+        """Return ISO country code for flag display"""
+        country_codes = {
+            'United States': 'us',
+            'Canada': 'ca',
+            'Mexico': 'mx',
+            'Argentina': 'ar',
+            'Brazil': 'br',
+            'Uruguay': 'uy',
+            'Colombia': 'co',
+            'Ecuador': 'ec',
+            'Paraguay': 'py',
+            'Spain': 'es',
+            'England': 'gb-eng',
+            'France': 'fr',
+            'Germany': 'de',
+            'Portugal': 'pt',
+            'Netherlands': 'nl',
+            'Belgium': 'be',
+            'Switzerland': 'ch',
+            'Croatia': 'hr',
+            'Austria': 'at',
+            'Norway': 'no',
+            'Scotland': 'gb-sct',
+            'Japan': 'jp',
+            'Australia': 'au',
+            'Iran': 'ir',
+            'South Korea': 'kr',
+            'Saudi Arabia': 'sa',
+            'Qatar': 'qa',
+            'Jordan': 'jo',
+            'Uzbekistan': 'uz',
+            'Morocco': 'ma',
+            'Senegal': 'sn',
+            'Egypt': 'eg',
+            'Algeria': 'dz',
+            'Tunisia': 'tn',
+            "Côte d'Ivoire": 'ci',
+            'South Africa': 'za',
+            'Ghana': 'gh',
+            'Cabo Verde': 'cv',
+            'Panama': 'pa',
+            'Curacao': 'cw',
+            'Haiti': 'ht',
+            'New Zealand': 'nz',
+        }
+        return country_codes.get(self.country, 'un')
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -81,6 +131,7 @@ class Team(db.Model):
             'fifa_rank': self.fifa_rank,
             'tournament_rank': self.tournament_rank,
             'confederation': self.confederation,
+            'group': self.group,
             'base_points': self.base_points,
             'current_points': self.current_points,
             'total_score': self.total_score,
@@ -88,7 +139,8 @@ class Team(db.Model):
             'draws': self.draws,
             'losses': self.losses,
             'eliminated': self.eliminated,
-            'elimination_round': self.elimination_round
+            'elimination_round': self.elimination_round,
+            'flag_code': self.flag_code
         }
 
 
@@ -206,6 +258,7 @@ def initialize_teams():
             fifa_rank=int(row['Rank']) if pd.notna(row['Rank']) else 999,
             tournament_rank=tournament_rank,
             confederation=row['Confederation'],
+            group=row.get('Group', ''),  # Get group from CSV
             base_points=base_points,
             current_points=base_points,
             total_score=0.0
@@ -560,18 +613,23 @@ def match_results():
             winner = Team.query.get(m.winner_id)
             if m.team1_id == m.winner_id:
                 home_team, away_team = team1.country, team2.country
+                home_flag, away_flag = team1.flag_code, team2.flag_code
                 home_score, away_score = 1, 0  # We don't store actual goals, just who won
             else:
                 home_team, away_team = team2.country, team1.country
+                home_flag, away_flag = team2.flag_code, team1.flag_code
                 home_score, away_score = 0, 1
         else:
             home_team, away_team = team1.country, team2.country
+            home_flag, away_flag = team1.flag_code, team2.flag_code
             home_score, away_score = 0, 0  # Draw
         
         match_data = {
             'id': m.id,
             'home_team': home_team,
             'away_team': away_team,
+            'home_flag': home_flag,
+            'away_flag': away_flag,
             'home_score': home_score,
             'away_score': away_score,
             'status': 'FINISHED',
@@ -734,11 +792,25 @@ def user_competition():
     # Sort by total score
     selection_data.sort(key=lambda x: x['total_score'], reverse=True)
     
-    all_teams = Team.query.order_by(Team.country).all()
+    # Get all teams organized by group
+    all_teams = Team.query.order_by(Team.group, Team.country).all()
+    
+    # Organize teams into groups
+    teams_by_group = {}
+    for team in all_teams:
+        group = team.group or 'Unknown'
+        if group not in teams_by_group:
+            teams_by_group[group] = []
+        teams_by_group[group].append(team)
+    
+    # Sort groups alphabetically
+    sorted_groups = sorted(teams_by_group.keys())
     
     return render_template('user_competition.html',
                           selections=selection_data,
                           all_teams=all_teams,
+                          teams_by_group=teams_by_group,
+                          sorted_groups=sorted_groups,
                           current_round=get_current_round())
 
 

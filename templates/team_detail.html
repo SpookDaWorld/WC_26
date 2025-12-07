@@ -4,8 +4,14 @@
 
 {% block content %}
 <div class="page-header">
-    <h2>{{ team.country }}</h2>
+    <h2>
+        <img src="https://flagcdn.com/48x36/{{ team.flag_code }}.png" 
+             srcset="https://flagcdn.com/96x72/{{ team.flag_code }}.png 2x"
+             class="flag flag-lg" alt="{{ team.country }}" style="margin-right: 0.75rem;">
+        {{ team.country }}
+    </h2>
     <p>
+        <span style="font-weight: 600; color: var(--accent-gold); margin-right: 0.5rem;">Group {{ team.group or 'TBD' }}</span>
         <span class="conf-badge conf-{{ team.confederation }}">{{ team.confederation }}</span>
         {% if team.eliminated %}
             <span class="status-badge status-eliminated">Eliminated: {{ team.elimination_round }}</span>
