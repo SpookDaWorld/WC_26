@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block title %}User Competition - World Cup 2026 Scorer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .team-selector {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.5rem;
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    
+    .team-option {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-card);
+        border: 2px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .team-option:hover {
+        border-color: var(--accent);
+    }
+    
+    .team-option.selected {
+        border-color: var(--accent-green);
+        background: rgba(0, 210, 106, 0.1);
+    }
+    
+    .team-option input {
+        display: none;
+    }
+    
+    .team-option .checkmark {
+        width: 18px;
+        height: 18px;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: transparent;
+        transition: all 0.2s ease;
+    }
+    
+    .team-option.selected .checkmark {
+        background: var(--accent-green);
+        border-color: var(--accent-green);
+        color: white;
+    }
+    
+    .selection-count {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.5rem;
+        color: var(--accent-gold);
+    }
+    
+    .user-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .user-card.winner {
+        border-color: var(--accent-gold);
+        background: linear-gradient(135deg, rgba(255, 201, 71, 0.1) 0%, rgba(255, 201, 71, 0.05) 100%);
+    }
+    
+    .user-rank {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 2rem;
+        color: var(--accent-gold);
+        margin-right: 1rem;
+    }
+    
+    .user-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    
+    .user-score {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.8rem;
+        color: var(--accent-green);
+    }
+    
+    .user-teams {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    
+    .user-team-badge {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .user-team-badge .team-score {
+        font-family: 'Bebas Neue', sans-serif;
+        color: var(--accent-gold);
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>User Competition</h2>
+    <p>Pick your teams and compete with friends!</p>
+</div>
+
+<div class="grid grid-2">
+    <!-- Create Selection -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Create Your Selection</h3>
+            <div>
+                <span style="color: var(--text-secondary);">Selected: </span>
+                <span class="selection-count" id="selectionCount">0</span>
+                <span style="color: var(--text-secondary);"> / 4</span>
+            </div>
+        </div>
+        
+        <form id="selectionForm">
+            <div class="form-group">
+                <label class="form-label">Your Name</label>
+                <input type="text" id="userName" class="form-input" placeholder="Enter your name" required>
+            </div>
+            
+            <label class="form-label">Select 3-4 Teams</label>
+            <div class="team-selector" id="teamSelector">
+                {% for team in all_teams %}
+                <label class="team-option" data-team-id="{{ team.id }}">
+                    <input type="checkbox" name="teams" value="{{ team.id }}">
+                    <span class="checkmark">✓</span>
+                    <span>{{ team.country }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                Submit Selection
+            </button>
+        </form>
+        
+        <div id="formMessage" style="margin-top: 1rem; display: none;"></div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div>
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">🏆 Competition Leaderboard</h3>
+            </div>
+            
+            {% if selections %}
+                {% for sel in selections %}
+                <div class="user-card {% if loop.index == 1 %}winner{% endif %}">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center;">
+                            <span class="user-rank">#{{ loop.index }}</span>
+                            <span class="user-name">{{ sel.user_name }}</span>
+                        </div>
+                        <span class="user-score">{{ "%.1f"|format(sel.total_score) }}</span>
+                    </div>
+                    
+                    <div class="user-teams">
+                        {% for team in sel.teams %}
+                        <span class="user-team-badge {% if team.eliminated %}eliminated{% endif %}">
+                            {{ team.country }}
+                            <span class="team-score">{{ "%.1f"|format(team.total_score) }}</span>
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">
+                    No selections yet. Be the first to pick your teams!
+                </p>
+            {% endif %}
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">How It Works</h3>
+            </div>
+            
+            <ul style="color: var(--text-secondary); margin-left: 1.5rem;">
+                <li style="margin-bottom: 0.75rem;">Pick 3-4 teams to be in your selection</li>
+                <li style="margin-bottom: 0.75rem;">Your score is the sum of your teams' tournament scores</li>
+                <li style="margin-bottom: 0.75rem;">As matches are played, scores update automatically</li>
+                <li style="margin-bottom: 0.75rem;">The user with the highest total score wins!</li>
+            </ul>
+            
+            <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; margin-top: 1rem;">
+                <p style="color: var(--accent-gold); font-weight: 600; margin-bottom: 0.5rem;">💡 Strategy Tip</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                    Balance between favorites (likely to win but worth fewer points) and underdogs (hard to win but worth more when they do).
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const teamOptions = document.querySelectorAll('.team-option');
+    const selectionCount = document.getElementById('selectionCount');
+    const form = document.getElementById('selectionForm');
+    const formMessage = document.getElementById('formMessage');
+    
+    // Handle team selection
+    teamOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const checkbox = option.querySelector('input');
+            const currentCount = document.querySelectorAll('.team-option.selected').length;
+            
+            if (!checkbox.checked && currentCount >= 4) {
+                // Can't select more than 4
+                return;
+            }
+            
+            checkbox.checked = !checkbox.checked;
+            option.classList.toggle('selected', checkbox.checked);
+            
+            // Update count
+            const newCount = document.querySelectorAll('.team-option.selected').length;
+            selectionCount.textContent = newCount;
+        });
+    });
+    
+    // Handle form submission
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const userName = document.getElementById('userName').value.trim();
+        const selectedTeams = Array.from(document.querySelectorAll('.team-option.selected'))
+            .map(opt => parseInt(opt.dataset.teamId));
+        
+        if (!userName) {
+            showMessage('Please enter your name', 'error');
+            return;
+        }
+        
+        if (selectedTeams.length < 3 || selectedTeams.length > 4) {
+            showMessage('Please select 3-4 teams', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/create-selection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_name: userName,
+                    team_ids: selectedTeams
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showMessage('Selection created successfully!', 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showMessage(data.message, 'error');
+            }
+        } catch (error) {
+            showMessage('An error occurred. Please try again.', 'error');
+        }
+    });
+    
+    function showMessage(text, type) {
+        formMessage.textContent = text;
+        formMessage.className = `flash flash-${type}`;
+        formMessage.style.display = 'block';
+    }
+</script>
+{% endblock %}

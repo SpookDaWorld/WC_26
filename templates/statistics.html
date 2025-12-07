@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics - World Cup 2026 Scorer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Tournament Statistics</h2>
+    <p>Charts and analysis of tournament performance</p>
+</div>
+
+<div class="grid grid-2">
+    <!-- Score Distribution Chart -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Top 15 Teams by Score</h3>
+        </div>
+        <canvas id="scoreChart" height="300"></canvas>
+    </div>
+    
+    <!-- Confederation Performance -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Confederation Total Scores</h3>
+        </div>
+        <canvas id="confScoreChart" height="300"></canvas>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: 1.5rem;">
+    <!-- Active Teams by Confederation -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Active vs Eliminated by Confederation</h3>
+        </div>
+        <canvas id="confActiveChart" height="300"></canvas>
+    </div>
+    
+    <!-- Average Score by Confederation -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Average Score by Confederation</h3>
+        </div>
+        <canvas id="confAvgChart" height="300"></canvas>
+    </div>
+</div>
+
+<!-- Confederation Stats Table -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Confederation Breakdown</h3>
+    </div>
+    
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Confederation</th>
+                <th>Total Teams</th>
+                <th>Active</th>
+                <th>Eliminated</th>
+                <th>Total Score</th>
+                <th>Avg Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stat in conf_stats %}
+            <tr>
+                <td>
+                    <span class="conf-badge conf-{{ stat.confederation }}">{{ stat.confederation }}</span>
+                </td>
+                <td>{{ stat.total_teams }}</td>
+                <td style="color: var(--accent-green);">{{ stat.active_teams }}</td>
+                <td style="color: var(--accent);">{{ stat.eliminated_teams }}</td>
+                <td class="score">{{ "%.1f"|format(stat.total_score) }}</td>
+                <td>{{ "%.1f"|format(stat.avg_score) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Color scheme for confederations
+    const confColors = {
+        'UEFA': '#1e3a8a',
+        'CONMEBOL': '#15803d',
+        'CONCACAF': '#b91c1c',
+        'AFC': '#a16207',
+        'CAF': '#7c2d12',
+        'OFC': '#0e7490'
+    };
+    
+    // Score Distribution Chart
+    const scoreCtx = document.getElementById('scoreChart').getContext('2d');
+    const scoreData = {{ score_distribution | tojson }};
+    
+    new Chart(scoreCtx, {
+        type: 'bar',
+        data: {
+            labels: scoreData.labels,
+            datasets: [{
+                label: 'Total Score',
+                data: scoreData.scores,
+                backgroundColor: 'rgba(233, 69, 96, 0.7)',
+                borderColor: 'rgba(233, 69, 96, 1)',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+                }
+            }
+        }
+    });
+    
+    // Confederation Score Chart
+    const confScoreCtx = document.getElementById('confScoreChart').getContext('2d');
+    const confData = {{ conf_chart | tojson }};
+    
+    new Chart(confScoreCtx, {
+        type: 'doughnut',
+        data: {
+            labels: confData.labels,
+            datasets: [{
+                data: confData.scores,
+                backgroundColor: confData.labels.map(l => confColors[l] || '#666'),
+                borderColor: 'rgba(0, 0, 0, 0.3)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { color: 'rgba(255, 255, 255, 0.7)' }
+                }
+            }
+        }
+    });
+    
+    // Active Teams Chart
+    const confActiveCtx = document.getElementById('confActiveChart').getContext('2d');
+    const confStats = {{ conf_stats | tojson }};
+    
+    new Chart(confActiveCtx, {
+        type: 'bar',
+        data: {
+            labels: confStats.map(s => s.confederation),
+            datasets: [
+                {
+                    label: 'Active',
+                    data: confStats.map(s => s.active_teams),
+                    backgroundColor: 'rgba(0, 210, 106, 0.7)',
+                    borderRadius: 4
+                },
+                {
+                    label: 'Eliminated',
+                    data: confStats.map(s => s.eliminated_teams),
+                    backgroundColor: 'rgba(233, 69, 96, 0.7)',
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    labels: { color: 'rgba(255, 255, 255, 0.7)' }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: { display: false },
+                    ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+                },
+                y: {
+                    stacked: true,
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    ticks: { color: 'rgba(255, 255, 255, 0.7)' }
+                }
+            }
+        }
+    });
+    
+    // Average Score Chart
+    const confAvgCtx = document.getElementById('confAvgChart').getContext('2d');
+    
+    new Chart(confAvgCtx, {
+        type: 'radar',
+        data: {
+            labels: confStats.map(s => s.confederation),
+            datasets: [{
+                label: 'Average Score',
+                data: confStats.map(s => s.avg_score),
+                backgroundColor: 'rgba(255, 201, 71, 0.2)',
+                borderColor: 'rgba(255, 201, 71, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(255, 201, 71, 1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                r: {
+                    angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    pointLabels: { color: 'rgba(255, 255, 255, 0.7)' },
+                    ticks: { 
+                        color: 'rgba(255, 255, 255, 0.5)',
+                        backdropColor: 'transparent'
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

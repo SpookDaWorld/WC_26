@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Record Match - World Cup 2026 Scorer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Record Match Result</h2>
+    <p>Record wins and draws for the tournament</p>
+</div>
+
+<div class="grid grid-2">
+    <!-- Record Win -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">⚽ Record a Win</h3>
+        </div>
+        
+        <form method="POST">
+            <input type="hidden" name="match_type" value="win">
+            
+            <div class="form-group">
+                <label class="form-label">Winner</label>
+                <select name="winner" class="form-select" required>
+                    <option value="">Select winning team...</option>
+                    {% for team in active_teams %}
+                    <option value="{{ team.country }}">{{ team.country }} ({{ team.current_points }} pts)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Loser</label>
+                <select name="loser" class="form-select" required>
+                    <option value="">Select losing team...</option>
+                    {% for team in active_teams %}
+                    <option value="{{ team.country }}">{{ team.country }} ({{ team.current_points }} pts)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                Record Win
+            </button>
+        </form>
+        
+        <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                <strong>How scoring works:</strong><br>
+                The winner earns points equal to the loser's current point value.
+                {% if not is_group_stage %}
+                In knockout rounds, the winner also takes the loser's point value for future matches.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Record Draw -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">↔️ Record a Draw</h3>
+            {% if not is_group_stage %}
+            <span class="status-badge status-eliminated">Disabled</span>
+            {% endif %}
+        </div>
+        
+        {% if is_group_stage %}
+        <form method="POST">
+            <input type="hidden" name="match_type" value="draw">
+            
+            <div class="form-group">
+                <label class="form-label">Team 1</label>
+                <select name="team1" class="form-select" required>
+                    <option value="">Select team...</option>
+                    {% for team in active_teams %}
+                    <option value="{{ team.country }}">{{ team.country }} ({{ team.current_points }} pts)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Team 2</label>
+                <select name="team2" class="form-select" required>
+                    <option value="">Select team...</option>
+                    {% for team in active_teams %}
+                    <option value="{{ team.country }}">{{ team.country }} ({{ team.current_points }} pts)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-secondary" style="width: 100%; justify-content: center;">
+                Record Draw
+            </button>
+        </form>
+        {% else %}
+        <p style="color: var(--text-secondary); padding: 2rem; text-align: center;">
+            Draws are only allowed in the Group Stage.<br>
+            Knockout rounds must have a winner.
+        </p>
+        {% endif %}
+        
+        <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                <strong>Draw scoring:</strong><br>
+                Each team earns half of the opponent's current point value.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Undo Last Match -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">↩️ Undo Last Match</h3>
+    </div>
+    
+    <form action="{{ url_for('admin_undo_match') }}" method="POST" onsubmit="return confirm('Are you sure you want to undo the last match?');">
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Made a mistake? You can undo the most recent match result.
+        </p>
+        <button type="submit" class="btn btn-danger">
+            Undo Last Match
+        </button>
+    </form>
+</div>
+
+<!-- Active Teams Reference -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Active Teams ({{ active_teams|length }})</h3>
+    </div>
+    
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+        {% for team in active_teams %}
+        <a href="{{ url_for('team_detail', country=team.country) }}" 
+           style="background: var(--bg-card); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; color: var(--text-primary); display: inline-flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border);">
+            {{ team.country }}
+            <span style="color: var(--accent-gold); font-family: 'Bebas Neue', sans-serif;">{{ team.current_points }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

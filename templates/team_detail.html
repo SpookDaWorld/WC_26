@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}{{ team.country }} - World Cup 2026 Scorer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>{{ team.country }}</h2>
+    <p>
+        <span class="conf-badge conf-{{ team.confederation }}">{{ team.confederation }}</span>
+        {% if team.eliminated %}
+            <span class="status-badge status-eliminated">Eliminated: {{ team.elimination_round }}</span>
+        {% else %}
+            <span class="status-badge status-active">Active</span>
+        {% endif %}
+    </p>
+</div>
+
+<!-- Team Stats -->
+<div class="grid grid-4" style="margin-bottom: 2rem;">
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.1f"|format(team.total_score) }}</div>
+        <div class="stat-label">Total Score</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ team.current_points }}</div>
+        <div class="stat-label">Current Value</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ team.fifa_rank }}</div>
+        <div class="stat-label">FIFA Rank</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ team.tournament_rank }}</div>
+        <div class="stat-label">Tournament Seed</div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <!-- Match Record -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Match Record</h3>
+        </div>
+        
+        <div class="grid grid-3" style="text-align: center; margin-bottom: 1.5rem;">
+            <div>
+                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--accent-green);">{{ team.wins }}</div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">WINS</div>
+            </div>
+            <div>
+                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--accent-gold);">{{ team.draws }}</div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">DRAWS</div>
+            </div>
+            <div>
+                <div style="font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--accent);">{{ team.losses }}</div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">LOSSES</div>
+            </div>
+        </div>
+        
+        <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span style="color: var(--text-secondary);">Base Point Value</span>
+                <span>{{ team.base_points }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span style="color: var(--text-secondary);">Current Point Value</span>
+                <span style="color: var(--accent-gold);">{{ team.current_points }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-secondary);">Total Matches</span>
+                <span>{{ team.wins + team.draws + team.losses }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Point Value Info -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Point Value Explained</h3>
+        </div>
+        
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Each team has a <strong>point value</strong> based on their FIFA ranking. When a team beats another:
+        </p>
+        
+        <ul style="color: var(--text-secondary); margin-left: 1.5rem; margin-bottom: 1rem;">
+            <li style="margin-bottom: 0.5rem;">The winner earns points equal to the loser's point value</li>
+            <li style="margin-bottom: 0.5rem;">In knockout rounds, the winner takes the loser's point value</li>
+            <li style="margin-bottom: 0.5rem;">In draws, each team earns half the opponent's value</li>
+        </ul>
+        
+        <div style="background: var(--gradient-accent); padding: 1rem; border-radius: 8px; text-align: center;">
+            <div style="font-size: 0.85rem; opacity: 0.8;">Defeating {{ team.country }} is worth</div>
+            <div style="font-family: 'Bebas Neue', sans-serif; font-size: 2rem;">{{ team.current_points }} POINTS</div>
+        </div>
+    </div>
+</div>
+
+<!-- Match History for this Team -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Match History</h3>
+    </div>
+    
+    {% if matches %}
+        {% for match in matches %}
+        <div class="match-item">
+            <div class="match-teams">
+                <span class="match-round" style="min-width: 120px;">{{ match.round_name }}</span>
+                
+                {% if match.match_type == 'win' %}
+                    {% if match.winner_id == team.id %}
+                        <span style="color: var(--accent-green);">✓ Won vs</span>
+                        <span>{{ match.team2.country if match.team1_id == team.id else match.team1.country }}</span>
+                    {% else %}
+                        <span style="color: var(--accent);">✗ Lost to</span>
+                        <span>{{ match.winner.country }}</span>
+                    {% endif %}
+                {% else %}
+                    <span style="color: var(--accent-gold);">↔ Drew with</span>
+                    <span>{{ match.team2.country if match.team1_id == team.id else match.team1.country }}</span>
+                {% endif %}
+            </div>
+            
+            <div class="match-result">
+                {% if match.match_type == 'win' %}
+                    {% if match.winner_id == team.id %}
+                        <span style="color: var(--accent-green);">+{{ "%.1f"|format(match.points_earned) }} pts</span>
+                    {% else %}
+                        <span style="color: var(--accent);">-</span>
+                    {% endif %}
+                {% else %}
+                    {% if match.team1_id == team.id %}
+                        <span style="color: var(--accent-gold);">+{{ "%.1f"|format(match.team1_earned) }} pts</span>
+                    {% else %}
+                        <span style="color: var(--accent-gold);">+{{ "%.1f"|format(match.team2_earned) }} pts</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">
+            No matches recorded yet for {{ team.country }}.
+        </p>
+    {% endif %}
+</div>
+
+<div style="margin-top: 1.5rem;">
+    <a href="{{ url_for('leaderboard') }}" class="btn btn-secondary">← Back to Leaderboard</a>
+</div>
+{% endblock %}

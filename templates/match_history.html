@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Match History - World Cup 2026 Scorer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Match History</h2>
+    <p>Complete record of all {{ matches|length }} matches played</p>
+</div>
+
+{% if matches %}
+<div class="card">
+    {% for match in matches %}
+    <div class="match-item">
+        <div class="match-teams">
+            <span class="match-round" style="min-width: 120px;">{{ match.round_name }}</span>
+            
+            {% if match.match_type == 'win' %}
+                <strong style="color: var(--accent-green);">{{ match.winner.country }}</strong>
+                <span class="match-vs">defeated</span>
+                <span>{{ match.team2.country if match.team1_id == match.winner_id else match.team1.country }}</span>
+            {% else %}
+                <span>{{ match.team1.country }}</span>
+                <span class="match-vs">drew with</span>
+                <span>{{ match.team2.country }}</span>
+            {% endif %}
+        </div>
+        
+        <div class="match-result">
+            {% if match.match_type == 'win' %}
+                <span style="color: var(--accent-gold);">+{{ "%.1f"|format(match.points_earned) }} pts</span>
+            {% else %}
+                <span style="color: var(--text-secondary);">
+                    {{ match.team1.country }}: +{{ "%.1f"|format(match.team1_earned) }} | 
+                    {{ match.team2.country }}: +{{ "%.1f"|format(match.team2_earned) }}
+                </span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align: center; padding: 3rem;">
+    <p style="color: var(--text-secondary); font-size: 1.2rem;">No matches recorded yet.</p>
+    <a href="{{ url_for('record_match_view') }}" class="btn btn-primary" style="margin-top: 1rem;">
+        Record First Match
+    </a>
+</div>
+{% endif %}
+
+<!-- Match Statistics -->
+{% if matches %}
+<div class="grid grid-3" style="margin-top: 2rem;">
+    <div class="stat-card">
+        <div class="stat-value">{{ matches|selectattr('match_type', 'equalto', 'win')|list|length }}</div>
+        <div class="stat-label">Decisive Matches</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ matches|selectattr('match_type', 'equalto', 'draw')|list|length }}</div>
+        <div class="stat-label">Draws</div>
+    </div>
+    <div class="stat-card">
+        {% set total_points = matches|map(attribute='points_earned')|select('number')|sum + matches|map(attribute='team1_earned')|select('number')|sum + matches|map(attribute='team2_earned')|select('number')|sum %}
+        <div class="stat-value">{{ "%.0f"|format(total_points) }}</div>
+        <div class="stat-label">Total Points Awarded</div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

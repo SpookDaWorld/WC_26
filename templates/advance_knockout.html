@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Advance to Knockout - World Cup 2026 Scorer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Advance to Knockout Rounds</h2>
+    <p>Select the teams that will advance from the group stage</p>
+</div>
+
+{% if current_round != 'Group Stage' %}
+<div class="card" style="text-align: center; padding: 3rem;">
+    <p style="color: var(--accent); font-size: 1.2rem;">
+        Already in knockout phase: {{ current_round }}
+    </p>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary" style="margin-top: 1rem;">
+        Return to Dashboard
+    </a>
+</div>
+{% else %}
+<div class="card">
+    <form method="POST">
+        <div class="card-header">
+            <h3 class="card-title">Select Advancing Teams</h3>
+            <div>
+                <button type="button" class="btn btn-secondary" onclick="selectTop(32)">Select Top 32</button>
+                <button type="button" class="btn btn-secondary" onclick="selectTop(16)">Select Top 16</button>
+                <button type="button" class="btn btn-secondary" onclick="clearAll()">Clear All</button>
+            </div>
+        </div>
+        
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Teams are sorted by current total score. Select the teams that qualified from their groups.
+        </p>
+        
+        <div class="checkbox-grid">
+            {% for team in teams %}
+            <label class="checkbox-item" data-rank="{{ loop.index }}">
+                <input type="checkbox" name="advancing" value="{{ team.country }}">
+                <span>
+                    <strong>{{ loop.index }}.</strong> {{ team.country }}
+                    <span style="color: var(--accent-gold);">({{ "%.1f"|format(team.total_score) }})</span>
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+        
+        <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-secondary);">
+                    Selected: <span id="selectedCount" style="color: var(--accent-gold); font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem;">0</span> teams
+                </span>
+                <button type="submit" class="btn btn-primary">
+                    Advance Selected Teams
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">⚠️ Important</h3>
+    </div>
+    <ul style="color: var(--text-secondary); margin-left: 1.5rem;">
+        <li style="margin-bottom: 0.5rem;">Teams not selected will be eliminated from the tournament</li>
+        <li style="margin-bottom: 0.5rem;">Each team's point value will be updated to their group stage score</li>
+        <li style="margin-bottom: 0.5rem;">This action cannot be undone (except by resetting the tournament)</li>
+    </ul>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const checkboxes = document.querySelectorAll('input[name="advancing"]');
+    const countDisplay = document.getElementById('selectedCount');
+    
+    function updateCount() {
+        const count = document.querySelectorAll('input[name="advancing"]:checked').length;
+        countDisplay.textContent = count;
+    }
+    
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateCount);
+    });
+    
+    function selectTop(n) {
+        checkboxes.forEach((cb, idx) => {
+            cb.checked = idx < n;
+        });
+        updateCount();
+    }
+    
+    function clearAll() {
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+        });
+        updateCount();
+    }
+</script>
+{% endblock %}

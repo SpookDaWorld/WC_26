@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Leaderboard - World Cup 2026 Scorer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Tournament Leaderboard</h2>
+    <p>Complete standings for all {{ teams|length }} teams</p>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <form method="GET" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Filter</label>
+            <select name="filter" class="form-select" onchange="this.form.submit()">
+                <option value="all" {% if filter_type == 'all' %}selected{% endif %}>All Teams</option>
+                <option value="active" {% if filter_type == 'active' %}selected{% endif %}>Active Only</option>
+                <option value="eliminated" {% if filter_type == 'eliminated' %}selected{% endif %}>Eliminated Only</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Show Top</label>
+            <select name="top_n" class="form-select" onchange="this.form.submit()">
+                <option value="all" {% if top_n == 'all' %}selected{% endif %}>All</option>
+                <option value="10" {% if top_n == '10' or top_n == 10 %}selected{% endif %}>Top 10</option>
+                <option value="20" {% if top_n == '20' or top_n == 20 %}selected{% endif %}>Top 20</option>
+                <option value="32" {% if top_n == '32' or top_n == 32 %}selected{% endif %}>Top 32</option>
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- Leaderboard Table -->
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Country</th>
+                <th>Confederation</th>
+                <th>Total Score</th>
+                <th>Current Value</th>
+                <th>Wins</th>
+                <th>Draws</th>
+                <th>Losses</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for team in teams %}
+            <tr class="{% if team.eliminated %}eliminated{% endif %}">
+                <td class="rank">{{ loop.index }}</td>
+                <td class="country">
+                    <a href="{{ url_for('team_detail', country=team.country) }}">{{ team.country }}</a>
+                </td>
+                <td>
+                    <span class="conf-badge conf-{{ team.confederation }}">{{ team.confederation }}</span>
+                </td>
+                <td class="score">{{ "%.1f"|format(team.total_score) }}</td>
+                <td>{{ team.current_points }}</td>
+                <td>{{ team.wins }}</td>
+                <td>{{ team.draws }}</td>
+                <td>{{ team.losses }}</td>
+                <td>
+                    {% if team.eliminated %}
+                        <span class="status-badge status-eliminated">{{ team.elimination_round }}</span>
+                    {% else %}
+                        <span class="status-badge status-active">Active</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
