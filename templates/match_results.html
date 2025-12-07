@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Match Results - World Cup 2026 Scorer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .match-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all 0.2s ease;
+    }
+    
+    .match-card:hover {
+        background: var(--bg-card-hover);
+    }
+    
+    .match-card.live {
+        border-color: var(--accent);
+        animation: pulse-border 2s infinite;
+    }
+    
+    @keyframes pulse-border {
+        0%, 100% { border-color: var(--accent); }
+        50% { border-color: rgba(233, 69, 96, 0.3); }
+    }
+    
+    .match-teams {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex: 1;
+    }
+    
+    .team {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 150px;
+    }
+    
+    .team.home {
+        justify-content: flex-end;
+        text-align: right;
+    }
+    
+    .team.away {
+        justify-content: flex-start;
+    }
+    
+    .team-name {
+        font-weight: 600;
+        font-size: 1rem;
+    }
+    
+    .team-name a {
+        color: var(--text-primary);
+        text-decoration: none;
+    }
+    
+    .team-name a:hover {
+        color: var(--accent);
+    }
+    
+    .team.winner .team-name {
+        color: var(--accent-green);
+    }
+    
+    .score-box {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        min-width: 80px;
+        justify-content: center;
+    }
+    
+    .score {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.5rem;
+        color: var(--text-primary);
+    }
+    
+    .score-separator {
+        color: var(--text-secondary);
+    }
+    
+    .match-info {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.25rem;
+        min-width: 120px;
+    }
+    
+    .match-time {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    
+    .match-stage {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .live-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--accent);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .live-indicator .dot {
+        width: 6px;
+        height: 6px;
+        background: white;
+        border-radius: 50%;
+        animation: blink 1s infinite;
+    }
+    
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+    
+    .vs-text {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        padding: 0 1rem;
+    }
+    
+    .no-matches {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--text-secondary);
+    }
+    
+    .no-matches h3 {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.8rem;
+        color: var(--accent-gold);
+        margin-bottom: 1rem;
+    }
+    
+    .no-matches p {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .date-header {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.2rem;
+        color: var(--accent-gold);
+        margin: 1.5rem 0 1rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border);
+    }
+    
+    .date-header:first-child {
+        margin-top: 0;
+    }
+    
+    .penalty-info {
+        font-size: 0.75rem;
+        color: var(--accent-gold);
+        margin-top: 0.25rem;
+    }
+    
+    .filter-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .filter-tab {
+        padding: 0.5rem 1rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+    
+    .filter-tab:hover {
+        border-color: var(--accent);
+        color: var(--text-primary);
+    }
+    
+    .filter-tab.active {
+        background: var(--gradient-accent);
+        border-color: var(--accent);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Match Results</h2>
+    <p>Live scores and results from the World Cup 2026</p>
+</div>
+
+<!-- Filter Tabs -->
+<div class="filter-tabs">
+    <a href="{{ url_for('match_results', filter='all') }}" class="filter-tab {% if filter == 'all' %}active{% endif %}">All Matches</a>
+    <a href="{{ url_for('match_results', filter='live') }}" class="filter-tab {% if filter == 'live' %}active{% endif %}">🔴 Live</a>
+    <a href="{{ url_for('match_results', filter='today') }}" class="filter-tab {% if filter == 'today' %}active{% endif %}">Today</a>
+    <a href="{{ url_for('match_results', filter='finished') }}" class="filter-tab {% if filter == 'finished' %}active{% endif %}">Completed</a>
+    <a href="{{ url_for('match_results', filter='upcoming') }}" class="filter-tab {% if filter == 'upcoming' %}active{% endif %}">Upcoming</a>
+</div>
+
+{% if live_matches %}
+<!-- Live Matches -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">🔴 Live Now</h3>
+    </div>
+    
+    {% for match in live_matches %}
+    <div class="match-card live">
+        <div class="match-teams">
+            <div class="team home {% if match.home_score > match.away_score %}winning{% endif %}">
+                <span class="team-name">
+                    <a href="{{ url_for('team_detail', country=match.home_team) }}">{{ match.home_team }}</a>
+                </span>
+            </div>
+            
+            <div class="score-box">
+                <span class="score">{{ match.home_score }}</span>
+                <span class="score-separator">-</span>
+                <span class="score">{{ match.away_score }}</span>
+            </div>
+            
+            <div class="team away {% if match.away_score > match.home_score %}winning{% endif %}">
+                <span class="team-name">
+                    <a href="{{ url_for('team_detail', country=match.away_team) }}">{{ match.away_team }}</a>
+                </span>
+            </div>
+        </div>
+        
+        <div class="match-info">
+            <span class="live-indicator">
+                <span class="dot"></span>
+                {{ match.minute }}'
+            </span>
+            <span class="match-stage">{{ match.stage }}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if matches %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            {% if filter == 'finished' %}Completed Matches
+            {% elif filter == 'upcoming' %}Upcoming Matches
+            {% elif filter == 'today' %}Today's Matches
+            {% else %}All Matches
+            {% endif %}
+        </h3>
+        <span style="color: var(--text-secondary);">{{ matches|length }} match{{ 'es' if matches|length != 1 else '' }}</span>
+    </div>
+    
+    {% set current_date = namespace(value='') %}
+    {% for match in matches %}
+        {% if match.date != current_date.value %}
+            {% set current_date.value = match.date %}
+            <div class="date-header">{{ match.date_formatted }}</div>
+        {% endif %}
+        
+        <div class="match-card {% if match.status == 'LIVE' %}live{% endif %}">
+            <div class="match-teams">
+                <div class="team home {% if match.status == 'FINISHED' and match.home_score > match.away_score %}winner{% endif %}">
+                    <span class="team-name">
+                        <a href="{{ url_for('team_detail', country=match.home_team) }}">{{ match.home_team }}</a>
+                    </span>
+                </div>
+                
+                {% if match.status == 'FINISHED' or match.status == 'LIVE' %}
+                <div class="score-box">
+                    <span class="score">{{ match.home_score }}</span>
+                    <span class="score-separator">-</span>
+                    <span class="score">{{ match.away_score }}</span>
+                </div>
+                {% else %}
+                <span class="vs-text">vs</span>
+                {% endif %}
+                
+                <div class="team away {% if match.status == 'FINISHED' and match.away_score > match.home_score %}winner{% endif %}">
+                    <span class="team-name">
+                        <a href="{{ url_for('team_detail', country=match.away_team) }}">{{ match.away_team }}</a>
+                    </span>
+                </div>
+            </div>
+            
+            <div class="match-info">
+                {% if match.status == 'FINISHED' %}
+                    <span class="match-time">Final</span>
+                    {% if match.penalties %}
+                    <span class="penalty-info">{{ match.penalties }}</span>
+                    {% endif %}
+                {% elif match.status == 'LIVE' %}
+                    <span class="live-indicator">
+                        <span class="dot"></span>
+                        Live
+                    </span>
+                {% else %}
+                    <span class="match-time">{{ match.time }}</span>
+                {% endif %}
+                <span class="match-stage">{{ match.stage }}</span>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<!-- No Matches Message -->
+<div class="card">
+    <div class="no-matches">
+        <h3>⚽ No Matches Yet</h3>
+        {% if filter == 'live' %}
+            <p>No matches are currently live.</p>
+            <p>Check back during match times!</p>
+        {% elif filter == 'finished' %}
+            <p>No matches have been completed yet.</p>
+            <p>The World Cup 2026 kicks off June 11, 2026.</p>
+        {% elif filter == 'today' %}
+            <p>No matches scheduled for today.</p>
+        {% else %}
+            <p>The World Cup 2026 hasn't started yet.</p>
+            <p>Tournament begins June 11, 2026 in the United States, Canada, and Mexico.</p>
+            <p style="margin-top: 1.5rem; color: var(--accent-gold);">{{ qualified_count }} teams qualified so far!</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Auto-refresh for live matches -->
+{% if live_matches %}
+<script>
+    // Auto-refresh page every 60 seconds when there are live matches
+    setTimeout(function() {
+        location.reload();
+    }, 60000);
+</script>
+{% endif %}
+{% endblock %}

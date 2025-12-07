@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - World Cup 2026 Scorer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🔐 Admin Dashboard</h2>
+    <p>Manage tournament settings and manually record matches</p>
+</div>
+
+<div class="grid grid-2">
+    <!-- Manual Match Recording -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">⚽ Record Match Manually</h3>
+        </div>
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Use this if the scraper misses a match or you need to make corrections.
+        </p>
+        <a href="{{ url_for('record_match_view') }}" class="btn btn-primary" style="width: 100%; justify-content: center;">
+            Go to Match Recording
+        </a>
+    </div>
+
+    <!-- Tournament Round Control -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">🏆 Tournament Round</h3>
+        </div>
+        
+        <form action="{{ url_for('admin_set_round') }}" method="POST">
+            <div class="form-group">
+                <label class="form-label">Current Round: <strong style="color: var(--accent-gold);">{{ current_round }}</strong></label>
+                <select name="round" class="form-select">
+                    {% for round in rounds %}
+                    <option value="{{ round }}" {% if round == current_round %}selected{% endif %}>{{ round }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-secondary" style="width: 100%; justify-content: center;">
+                Update Round
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: 1.5rem;">
+    <!-- Advance to Knockout -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📊 Advance to Knockout</h3>
+        </div>
+        
+        {% if current_round == 'Group Stage' %}
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Select which teams advance from group stage to knockout rounds.
+        </p>
+        <a href="{{ url_for('admin_advance_knockout') }}" class="btn btn-primary" style="width: 100%; justify-content: center;">
+            Select Advancing Teams
+        </a>
+        {% else %}
+        <p style="color: var(--text-secondary);">
+            Already in knockout phase. Current round: {{ current_round }}
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Undo Last Match -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">↩️ Undo Last Match</h3>
+        </div>
+        
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Made a mistake? Undo the most recent match result.
+        </p>
+        <form action="{{ url_for('admin_undo_match') }}" method="POST" onsubmit="return confirm('Are you sure you want to undo the last match?');">
+            <button type="submit" class="btn btn-secondary" style="width: 100%; justify-content: center;">
+                Undo Last Match
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Danger Zone -->
+<div class="card" style="margin-top: 1.5rem; border-color: var(--accent);">
+    <div class="card-header">
+        <h3 class="card-title" style="color: var(--accent);">⚠️ Danger Zone</h3>
+    </div>
+    
+    <div class="grid grid-2">
+        <div>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                <strong>Reset Tournament</strong><br>
+                Clear all match data and reinitialize teams from CSV files.
+            </p>
+            <form action="{{ url_for('admin_reset') }}" method="POST" onsubmit="return confirm('Are you sure you want to reset the entire tournament? This cannot be undone!');">
+                <button type="submit" class="btn btn-danger">
+                    Reset Tournament
+                </button>
+            </form>
+        </div>
+        
+        <div>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                <strong>Logout</strong><br>
+                End your admin session.
+            </p>
+            <a href="{{ url_for('admin_logout') }}" class="btn btn-secondary">
+                Logout
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">📈 Quick Stats</h3>
+    </div>
+    
+    <div class="grid grid-4">
+        <div class="stat-card">
+            <div class="stat-value">{{ active_count }}</div>
+            <div class="stat-label">Active Teams</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_count - active_count }}</div>
+            <div class="stat-label">Eliminated</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_count }}</div>
+            <div class="stat-label">Total Teams</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ current_round.split()[0] }}</div>
+            <div class="stat-label">Current Stage</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

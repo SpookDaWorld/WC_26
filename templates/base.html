@@ -539,7 +539,7 @@
             <ul class="nav-links">
                 <li><a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>Dashboard</a></li>
                 <li><a href="{{ url_for('leaderboard') }}" {% if request.endpoint == 'leaderboard' %}class="active"{% endif %}>Leaderboard</a></li>
-                <li><a href="{{ url_for('record_match_view') }}" {% if request.endpoint == 'record_match_view' %}class="active"{% endif %}>Record Match</a></li>
+                <li><a href="{{ url_for('match_results') }}" {% if request.endpoint == 'match_results' %}class="active"{% endif %}>Results</a></li>
                 <li><a href="{{ url_for('match_history') }}" {% if request.endpoint == 'match_history' %}class="active"{% endif %}>History</a></li>
                 <li><a href="{{ url_for('bracket') }}" {% if request.endpoint == 'bracket' %}class="active"{% endif %}>Bracket</a></li>
                 <li><a href="{{ url_for('statistics') }}" {% if request.endpoint == 'statistics' %}class="active"{% endif %}>Stats</a></li>

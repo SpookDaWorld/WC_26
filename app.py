@@ -13,11 +13,31 @@ import json
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'wc2026-secret-key-change-in-production'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'wc2026-dev-key-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tournament.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Admin password - set via environment variable in production
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'wc2026admin')
+
 db = SQLAlchemy(app)
+
+
+# ----------------------------------------------------
+# ADMIN AUTHENTICATION
+# ----------------------------------------------------
+
+from functools import wraps
+
+def admin_required(f):
+    """Decorator to require admin login for protected routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_logged_in'):
+            flash('Please log in to access admin features', 'error')
+            return redirect(url_for('admin_login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # ----------------------------------------------------
 # DATABASE MODELS
@@ -501,9 +521,79 @@ def leaderboard():
                           top_n=top_n or 'all')
 
 
+@app.route('/results')
+def match_results():
+    """Match results page - shows live scores and completed matches"""
+    filter_type = request.args.get('filter', 'all')
+    
+    # Get all matches from database, organized by type
+    all_matches = Match.query.order_by(Match.id.desc()).all()
+    
+    # Build match data for display
+    matches = []
+    live_matches = []
+    
+    for m in all_matches:
+        team1 = Team.query.get(m.team1_id)
+        team2 = Team.query.get(m.team2_id)
+        
+        if not team1 or not team2:
+            continue
+        
+        # Determine home/away and scores
+        if m.match_type == 'win':
+            winner = Team.query.get(m.winner_id)
+            if m.team1_id == m.winner_id:
+                home_team, away_team = team1.country, team2.country
+                home_score, away_score = 1, 0  # We don't store actual goals, just who won
+            else:
+                home_team, away_team = team2.country, team1.country
+                home_score, away_score = 0, 1
+        else:
+            home_team, away_team = team1.country, team2.country
+            home_score, away_score = 0, 0  # Draw
+        
+        match_data = {
+            'id': m.id,
+            'home_team': home_team,
+            'away_team': away_team,
+            'home_score': home_score,
+            'away_score': away_score,
+            'status': 'FINISHED',
+            'stage': m.round_name,
+            'date': m.timestamp.strftime('%Y-%m-%d') if m.timestamp else '',
+            'date_formatted': m.timestamp.strftime('%A, %B %d, %Y') if m.timestamp else '',
+            'time': m.timestamp.strftime('%H:%M') if m.timestamp else '',
+            'penalties': None
+        }
+        matches.append(match_data)
+    
+    # Filter based on request
+    if filter_type == 'live':
+        matches = []  # Live matches come from API, not DB
+    elif filter_type == 'finished':
+        pass  # All DB matches are finished
+    elif filter_type == 'upcoming':
+        matches = []  # Upcoming matches would come from API
+    elif filter_type == 'today':
+        today = datetime.utcnow().strftime('%Y-%m-%d')
+        matches = [m for m in matches if m['date'] == today]
+    
+    # Count qualified teams
+    qualified_count = Team.query.count()
+    
+    return render_template('match_results.html',
+                          matches=matches,
+                          live_matches=live_matches,
+                          filter=filter_type,
+                          qualified_count=qualified_count,
+                          current_round=get_current_round())
+
+
 @app.route('/record-match', methods=['GET', 'POST'])
+@admin_required
 def record_match_view():
-    """Record match results"""
+    """Record match results (Admin only)"""
     if request.method == 'POST':
         match_type = request.form.get('match_type')
         
@@ -666,7 +756,44 @@ def create_selection():
 # ADMIN ROUTES
 # ----------------------------------------------------
 
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    """Admin login page"""
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            flash('Logged in successfully', 'success')
+            next_url = request.args.get('next')
+            return redirect(next_url or url_for('admin_dashboard'))
+        else:
+            flash('Invalid password', 'error')
+    
+    return render_template('admin_login.html', current_round=get_current_round())
+
+
+@app.route('/admin/logout')
+def admin_logout():
+    """Admin logout"""
+    session.pop('admin_logged_in', None)
+    flash('Logged out successfully', 'success')
+    return redirect(url_for('index'))
+
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    """Admin dashboard"""
+    return render_template('admin_dashboard.html',
+                          current_round=get_current_round(),
+                          rounds=ROUNDS,
+                          teams=get_leaderboard(),
+                          active_count=Team.query.filter_by(eliminated=False).count(),
+                          total_count=Team.query.count())
+
+
 @app.route('/admin/set-round', methods=['POST'])
+@admin_required
 def admin_set_round():
     """Set tournament round"""
     round_name = request.form.get('round')
@@ -675,17 +802,18 @@ def admin_set_round():
         flash(f'Round set to: {round_name}', 'success')
     else:
         flash('Invalid round name', 'error')
-    return redirect(url_for('index'))
+    return redirect(url_for('admin_dashboard'))
 
 
 @app.route('/admin/advance-knockout', methods=['GET', 'POST'])
+@admin_required
 def admin_advance_knockout():
     """Advance to knockout rounds"""
     if request.method == 'POST':
         advancing = request.form.getlist('advancing')
         success, message = advance_to_knockout(advancing)
         flash(message, 'success' if success else 'error')
-        return redirect(url_for('index'))
+        return redirect(url_for('admin_dashboard'))
     
     teams = get_leaderboard()
     return render_template('advance_knockout.html',
@@ -694,19 +822,21 @@ def admin_advance_knockout():
 
 
 @app.route('/admin/undo-match', methods=['POST'])
+@admin_required
 def admin_undo_match():
     """Undo last match"""
     success, message = undo_last_match()
     flash(message, 'success' if success else 'error')
-    return redirect(url_for('record_match_view'))
+    return redirect(url_for('admin_dashboard'))
 
 
 @app.route('/admin/reset', methods=['POST'])
+@admin_required
 def admin_reset():
     """Reset tournament"""
     count = initialize_teams()
     flash(f'Tournament reset! {count} teams initialized.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('admin_dashboard'))
 
 
 # ----------------------------------------------------
@@ -767,5 +897,4 @@ def init_db():
 
 if __name__ == '__main__':
     init_db()
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=5000)
