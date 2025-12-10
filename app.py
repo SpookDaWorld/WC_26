@@ -783,6 +783,7 @@ def user_competition():
         teams = sel.get_teams()
         total = sum(t.total_score for t in teams)
         selection_data.append({
+            'id': sel.id,
             'user_name': sel.user_name,
             'teams': teams,
             'total_score': total,
@@ -806,11 +807,15 @@ def user_competition():
     # Sort groups alphabetically
     sorted_groups = sorted(teams_by_group.keys())
     
+    # Check if admin is logged in
+    is_admin = session.get('admin_logged_in', False)
+    
     return render_template('user_competition.html',
                           selections=selection_data,
                           all_teams=all_teams,
                           teams_by_group=teams_by_group,
                           sorted_groups=sorted_groups,
+                          is_admin=is_admin,
                           current_round=get_current_round())
 
 
@@ -840,6 +845,23 @@ def create_selection():
     db.session.commit()
     
     return jsonify({'success': True, 'message': 'Selection created!'})
+
+
+@app.route('/admin/delete-selection/<int:selection_id>', methods=['POST'])
+@admin_required
+def delete_selection(selection_id):
+    """Delete a user's team selection (Admin only)"""
+    selection = UserTeamSelection.query.get(selection_id)
+    
+    if selection:
+        user_name = selection.user_name
+        db.session.delete(selection)
+        db.session.commit()
+        flash(f'Deleted selection for "{user_name}"', 'success')
+    else:
+        flash('Selection not found', 'error')
+    
+    return redirect(url_for('user_competition'))
 
 
 # ----------------------------------------------------

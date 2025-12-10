@@ -157,6 +157,22 @@
         color: var(--accent-gold);
         font-size: 0.9rem;
     }
+    
+    .btn-delete {
+        background: transparent;
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-delete:hover {
+        background: var(--accent);
+        color: white;
+    }
 </style>
 {% endblock %}
 
@@ -219,6 +235,9 @@
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">🏆 Competition Leaderboard</h3>
+                {% if is_admin %}
+                <span style="color: var(--accent); font-size: 0.8rem;">🔐 Admin Mode</span>
+                {% endif %}
             </div>
             
             {% if selections %}
@@ -229,13 +248,20 @@
                             <span class="user-rank">#{{ loop.index }}</span>
                             <span class="user-name">{{ sel.user_name }}</span>
                         </div>
-                        <span class="user-score">{{ "%.1f"|format(sel.total_score) }}</span>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span class="user-score">{{ "%.1f"|format(sel.total_score) }}</span>
+                            {% if is_admin %}
+                            <form action="{{ url_for('delete_selection', selection_id=sel.id) }}" method="POST" style="margin: 0;" onsubmit="return confirm('Delete selection for {{ sel.user_name }}?');">
+                                <button type="submit" class="btn-delete" title="Delete this selection">🗑️</button>
+                            </form>
+                            {% endif %}
+                        </div>
                     </div>
                     
                     <div class="user-teams">
                         {% for team in sel.teams %}
                         <span class="user-team-badge {% if team.eliminated %}eliminated{% endif %}">
-                            {{ flag(team, 'flag-sm') }}
+                            <img src="https://flagcdn.com/20x15/{{ team.flag_code }}.png" class="flag flag-sm" alt="{{ team.country }}">
                             {{ team.country }}
                             <span class="team-score">{{ "%.1f"|format(team.total_score) }}</span>
                         </span>
