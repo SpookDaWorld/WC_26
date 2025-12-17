@@ -580,6 +580,7 @@
                 <li><a href="{{ url_for('bracket') }}" {% if request.endpoint == 'bracket' %}class="active"{% endif %}>Bracket</a></li>
                 <li><a href="{{ url_for('statistics') }}" {% if request.endpoint == 'statistics' %}class="active"{% endif %}>Stats</a></li>
                 <li><a href="{{ url_for('user_competition') }}" {% if request.endpoint == 'user_competition' %}class="active"{% endif %}>Team Selector</a></li>
+                <li><a href="{{ url_for('admin_login') }}" {% if request.endpoint in ['admin_login', 'admin_dashboard', 'record_match_view'] %}class="active"{% endif %}>🔐 Admin</a></li>
             </ul>
             
             <div class="round-badge">
