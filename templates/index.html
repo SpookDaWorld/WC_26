@@ -29,51 +29,6 @@
 </div>
 
 <div class="grid grid-2">
-    <!-- Top 20 Leaderboard -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Top 20 Teams</h3>
-            <a href="{{ url_for('leaderboard') }}" class="btn btn-secondary">View All</a>
-        </div>
-        
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Country</th>
-                    <th>Score</th>
-                    <th>W-D-L</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for team in teams %}
-                <tr class="{% if team.eliminated %}eliminated{% endif %}">
-                    <td class="rank">{{ loop.index }}</td>
-                    <td class="country">
-                        <span class="team-with-flag">
-                            <img src="https://flagcdn.com/24x18/{{ team.flag_code }}.png" 
-                                 srcset="https://flagcdn.com/48x36/{{ team.flag_code }}.png 2x"
-                                 class="flag" alt="{{ team.country }}">
-                            <a href="{{ url_for('team_detail', country=team.country) }}">{{ team.country }}</a>
-                        </span>
-                        <span class="conf-badge conf-{{ team.confederation }}">{{ team.confederation }}</span>
-                    </td>
-                    <td class="score">{{ "%.1f"|format(team.total_score) }}</td>
-                    <td>{{ team.wins }}-{{ team.draws }}-{{ team.losses }}</td>
-                    <td>
-                        {% if team.eliminated %}
-                            <span class="status-badge status-eliminated">Out: {{ team.elimination_round }}</span>
-                        {% else %}
-                            <span class="status-badge status-active">Active</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
     <!-- Quick Actions & Round Control -->
     <div>
         <div class="card">
@@ -125,6 +80,51 @@
             </div>
             <canvas id="scoreChart" height="200"></canvas>
         </div>
+    </div>
+
+    <!-- Top 20 Leaderboard -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Top 20 Teams</h3>
+            <a href="{{ url_for('leaderboard') }}" class="btn btn-secondary">View All</a>
+        </div>
+        
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Country</th>
+                    <th>Score</th>
+                    <th>W-D-L</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in teams %}
+                <tr class="{% if team.eliminated %}eliminated{% endif %}">
+                    <td class="rank">{{ loop.index }}</td>
+                    <td class="country">
+                        <span class="team-with-flag">
+                            <img src="https://flagcdn.com/24x18/{{ team.flag_code }}.png" 
+                                 srcset="https://flagcdn.com/48x36/{{ team.flag_code }}.png 2x"
+                                 class="flag" alt="{{ team.country }}">
+                            <a href="{{ url_for('team_detail', country=team.country) }}">{{ team.country }}</a>
+                        </span>
+                        <span class="conf-badge conf-{{ team.confederation }}">{{ team.confederation }}</span>
+                    </td>
+                    <td class="score">{{ "%.1f"|format(team.total_score) }}</td>
+                    <td>{{ team.wins }}-{{ team.draws }}-{{ team.losses }}</td>
+                    <td>
+                        {% if team.eliminated %}
+                            <span class="status-badge status-eliminated">Out: {{ team.elimination_round }}</span>
+                        {% else %}
+                            <span class="status-badge status-active">Active</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endblock %}
