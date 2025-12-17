@@ -82,6 +82,9 @@
             </div>
             
             <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <a href="{{ url_for('user_competition') }}" class="btn btn-success" style="justify-content: center;">
+                    👥 Team Selector
+                </a>
                 <a href="{{ url_for('match_results') }}" class="btn btn-primary" style="justify-content: center;">
                     ⚽ View Match Results
                 </a>
@@ -91,8 +94,8 @@
                 <a href="{{ url_for('bracket') }}" class="btn btn-secondary" style="justify-content: center;">
                     🏆 View Bracket
                 </a>
-                <a href="{{ url_for('user_competition') }}" class="btn btn-secondary" style="justify-content: center;">
-                    👥 Team Selector
+                <a href="{{ url_for('admin_login') }}" class="btn btn-secondary" style="justify-content: center;">
+                    🔐 Admin Login
                 </a>
             </div>
         </div>
@@ -102,7 +105,7 @@
                 <h3 class="card-title">Tournament Info</h3>
             </div>
             
-            <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+            <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                     <span style="color: var(--text-secondary);">Current Round</span>
                     <span style="color: var(--accent-gold); font-weight: 600;">{{ current_round }}</span>
@@ -116,10 +119,6 @@
                     <span>{{ match_count }}</span>
                 </div>
             </div>
-            
-            <a href="{{ url_for('admin_login') }}" class="btn btn-secondary" style="width: 100%; justify-content: center;">
-                🔐 Admin Login
-            </a>
         </div>
 
         <!-- Score Distribution Chart -->
