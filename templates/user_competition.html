@@ -173,6 +173,30 @@
         background: var(--accent);
         color: white;
     }
+    
+    .leaderboard-scroll {
+        max-height: 500px;
+        overflow-y: auto;
+        padding-right: 0.5rem;
+    }
+    
+    .leaderboard-scroll::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .leaderboard-scroll::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 3px;
+    }
+    
+    .leaderboard-scroll::-webkit-scrollbar-thumb {
+        background: var(--accent);
+        border-radius: 3px;
+    }
+    
+    .leaderboard-scroll::-webkit-scrollbar-thumb:hover {
+        background: var(--accent-gold);
+    }
 </style>
 {% endblock %}
 
@@ -196,8 +220,8 @@
         
         <form id="selectionForm">
             <div class="form-group">
-                <label class="form-label">Your Name <span style="color: var(--text-secondary); font-size: 0.8rem;">(max 20 characters)</span></label>
-                <input type="text" id="userName" class="form-input" placeholder="Enter your name" required maxlength="20">
+                <label class="form-label">Your Name <span style="color: var(--text-secondary); font-size: 0.8rem;">(max 20 characters, letters and numbers only)</span></label>
+                <input type="text" id="userName" class="form-input" placeholder="Enter your name" required maxlength="20" pattern="[A-Za-z0-9 _-]+" title="Letters, numbers, spaces, hyphens and underscores only">
             </div>
             
             <label class="form-label">Select 3-4 Teams</label>
@@ -240,6 +264,7 @@
                 {% endif %}
             </div>
             
+            <div class="leaderboard-scroll">
             {% if selections %}
                 {% for sel in selections %}
                 <div class="user-card {% if loop.index == 1 %}winner{% endif %}">
@@ -274,6 +299,7 @@
                     No selections yet. Be the first to pick your teams!
                 </p>
             {% endif %}
+            </div>
         </div>
         
         <div class="card">
@@ -326,16 +352,26 @@
         });
     });
     
+    // Filter out emojis and special characters from name input
+    const userNameInput = document.getElementById('userName');
+    userNameInput.addEventListener('input', (e) => {
+        // Only allow letters, numbers, spaces, hyphens, and underscores
+        e.target.value = e.target.value.replace(/[^A-Za-z0-9 _-]/g, '');
+    });
+    
     // Handle form submission
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const userName = document.getElementById('userName').value.trim();
+        let userName = document.getElementById('userName').value.trim();
+        // Final sanitization - remove any remaining non-allowed characters
+        userName = userName.replace(/[^A-Za-z0-9 _-]/g, '');
+        
         const selectedTeams = Array.from(document.querySelectorAll('.team-option.selected'))
             .map(opt => parseInt(opt.dataset.teamId));
         
         if (!userName) {
-            showMessage('Please enter your name', 'error');
+            showMessage('Please enter your name (letters and numbers only)', 'error');
             return;
         }
         

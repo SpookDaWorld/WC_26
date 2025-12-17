@@ -822,12 +822,19 @@ def user_competition():
 @app.route('/api/create-selection', methods=['POST'])
 def create_selection():
     """API to create user team selection"""
+    import re
     data = request.json
     user_name = data.get('user_name', '').strip()
     team_ids = data.get('team_ids', [])
     
     if not user_name:
         return jsonify({'success': False, 'message': 'User name required'}), 400
+    
+    # Sanitize: only allow letters, numbers, spaces, hyphens, underscores
+    user_name = re.sub(r'[^A-Za-z0-9 _-]', '', user_name).strip()
+    
+    if not user_name:
+        return jsonify({'success': False, 'message': 'Name must contain letters or numbers'}), 400
     
     if len(user_name) > 20:
         return jsonify({'success': False, 'message': 'Name must be 20 characters or less'}), 400
