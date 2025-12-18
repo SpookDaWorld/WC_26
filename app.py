@@ -223,13 +223,13 @@ def set_current_round(round_name):
 
 def calculate_starting_points(tournament_rank):
     """Calculate starting points based on tournament rank"""
-    A = 48  # max starting points at rank 1
-    k = 0.12  # exponential decay constant
+    A = 64  # max starting points at rank 1
+    k = 0.1  # exponential decay constant
     
-    if tournament_rank <= 24:
-        return int(round(A * np.exp(-k * (tournament_rank - 1))))
-    else:
-        return 2
+    # if tournament_rank <= 24:
+    #     return int(round(A * np.exp(-k * (tournament_rank - 1))))
+    # else:
+    #     return 2
 
 
 def initialize_teams():
