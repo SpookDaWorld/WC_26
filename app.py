@@ -225,7 +225,7 @@ def calculate_starting_points(tournament_rank):
     """Calculate starting points based on tournament rank"""
     A = 64  # max starting points at rank 1
     k = 0.1  # exponential decay constant
-    
+    return int(round(A * np.exp(-k * (tournament_rank - 1))))
     # if tournament_rank <= 24:
     #     return int(round(A * np.exp(-k * (tournament_rank - 1))))
     # else:
