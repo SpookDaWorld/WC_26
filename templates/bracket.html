@@ -185,7 +185,7 @@
     </div>
     
     <div class="seeding-grid">
-        {% for team in teams[:32] %}
+        {% for team in teams %}
         <div class="seed-item {% if team.eliminated %}eliminated{% endif %}">
             <span>
                 <span class="seed-number">{{ loop.index }}</span>
