@@ -223,7 +223,7 @@ def set_current_round(round_name):
 
 def calculate_starting_points(tournament_rank):
     """Calculate starting points based on tournament rank"""
-    A = 64  # max starting points at rank 1
+    A = 60  # max starting points at rank 1
     k = 0.1  # exponential decay constant
     return int(round(A * np.exp(-k * (tournament_rank - 1))))
     # if tournament_rank <= 24:
@@ -946,6 +946,21 @@ def admin_undo_match():
     """Undo last match"""
     success, message = undo_last_match()
     flash(message, 'success' if success else 'error')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/recalculate-points', methods=['POST'])
+@admin_required
+def admin_recalculate_points():
+    """Recalculate base points using current formula (doesn't reset match history)"""
+    teams = Team.query.all()
+    for team in teams:
+        new_base = calculate_starting_points(team.tournament_rank)
+        # Update base_points and current_points (current = base for fresh start)
+        team.base_points = new_base
+        team.current_points = new_base
+    db.session.commit()
+    flash(f'Recalculated base points for {len(teams)} teams using new formula (A=64, k=0.1)', 'success')
     return redirect(url_for('admin_dashboard'))
 
 

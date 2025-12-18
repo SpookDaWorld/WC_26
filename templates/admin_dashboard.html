@@ -80,6 +80,22 @@
             </button>
         </form>
     </div>
+
+    <!-- Recalculate Points -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">🔄 Recalculate Points</h3>
+        </div>
+        
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Update all team base points using the current formula. Does NOT reset match history or scores.
+        </p>
+        <form action="{{ url_for('admin_recalculate_points') }}" method="POST" onsubmit="return confirm('Recalculate base points for all teams?');">
+            <button type="submit" class="btn btn-secondary" style="width: 100%; justify-content: center;">
+                Recalculate Base Points
+            </button>
+        </form>
+    </div>
 </div>
 
 <!-- Danger Zone -->
