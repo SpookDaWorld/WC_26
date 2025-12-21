@@ -554,6 +554,152 @@ class StandingsProcessor:
                 logger.error(f"Failed to advance: {message}")
             
             return success, message
+    
+    def attempt_knockout_advancement(self) -> Tuple[bool, str]:
+        """
+        Check if current knockout round is complete and advance to next round.
+        
+        Knockout round progression:
+        - Round of 32: 32 teams -> 16 matches -> 16 teams remain -> Round of 16
+        - Round of 16: 16 teams -> 8 matches -> 8 teams remain -> Quarter-finals
+        - Quarter-finals: 8 teams -> 4 matches -> 4 teams remain -> Semi-finals
+        - Semi-finals: 4 teams -> 2 matches -> 2 winners + 2 losers (not eliminated) -> Third Place & Final
+        - Third Place: 2 semi-final losers -> 1 match -> both eliminated -> Final ready
+        - Final: 2 teams -> 1 match -> Champion crowned
+        
+        Returns:
+            Tuple of (success, message)
+        """
+        with app.app_context():
+            from app import Match as AppMatch, Team, set_current_round, ROUND_TEAM_LIMITS
+            
+            current_round = get_current_round()
+            
+            # Define round progression and match requirements
+            knockout_progression = {
+                "Round of 32": {
+                    "matches_needed": 16,
+                    "teams_after": 16,
+                    "next_round": "Round of 16"
+                },
+                "Round of 16": {
+                    "matches_needed": 8,
+                    "teams_after": 8,
+                    "next_round": "Quarter-finals"
+                },
+                "Quarter-finals": {
+                    "matches_needed": 4,
+                    "teams_after": 4,
+                    "next_round": "Semi-finals"
+                },
+                "Semi-finals": {
+                    "matches_needed": 2,
+                    "teams_after": 4,  # 2 finalists + 2 semi-final losers (not eliminated yet)
+                    "next_round": "Third Place"  # Third Place and Final happen in parallel
+                },
+                "Third Place": {
+                    "matches_needed": 1,
+                    "teams_after": 2,  # Only 2 finalists remain active
+                    "next_round": "Final"
+                },
+                "Final": {
+                    "matches_needed": 1,
+                    "teams_after": 0,  # Tournament complete
+                    "next_round": None
+                }
+            }
+            
+            if current_round not in knockout_progression:
+                return False, f"Not in a knockout round (current: {current_round})"
+            
+            config = knockout_progression[current_round]
+            
+            # Count matches in current round
+            round_matches = AppMatch.query.filter_by(round_name=current_round).count()
+            
+            if round_matches < config["matches_needed"]:
+                return False, f"{current_round}: {round_matches}/{config['matches_needed']} matches played"
+            
+            # Count active teams
+            active_teams = Team.query.filter_by(eliminated=False).count()
+            
+            # Special handling for Semi-finals
+            # After semis, we have 2 finalists (not eliminated) + 2 semi-final losers (not eliminated, marked for 3rd place)
+            if current_round == "Semi-finals":
+                # Check that we have exactly 2 matches and 4 teams still "active" (2 finalists + 2 for 3rd place)
+                semi_losers = Team.query.filter(
+                    Team.eliminated == False,
+                    Team.elimination_round == 'Semi-finals (Available for 3rd Place)'
+                ).count()
+                
+                finalists = Team.query.filter(
+                    Team.eliminated == False,
+                    Team.elimination_round == ''
+                ).count()
+                
+                if semi_losers != 2 or finalists != 2:
+                    return False, f"Semi-finals not complete: {finalists} finalists, {semi_losers} 3rd place contenders"
+                
+                # Ready to advance - Third Place and Final can now be played
+                logger.info("=" * 50)
+                logger.info("SEMI-FINALS COMPLETE")
+                logger.info("=" * 50)
+                
+                success, msg = set_current_round("Third Place", force=True)
+                if success:
+                    logger.info("✓ Advanced to Third Place / Final stage")
+                    return True, "Advanced to Third Place match"
+                else:
+                    return False, f"Failed to advance: {msg}"
+            
+            # Special handling for Third Place
+            elif current_round == "Third Place":
+                # After 3rd place match, both participants should be eliminated
+                # Only 2 finalists should remain active
+                if active_teams != 2:
+                    return False, f"Third Place not complete: {active_teams} teams still active (expected 2 finalists)"
+                
+                logger.info("=" * 50)
+                logger.info("THIRD PLACE COMPLETE - READY FOR FINAL")
+                logger.info("=" * 50)
+                
+                success, msg = set_current_round("Final", force=True)
+                if success:
+                    logger.info("✓ Advanced to Final")
+                    return True, "Advanced to Final"
+                else:
+                    return False, f"Failed to advance: {msg}"
+            
+            # Special handling for Final
+            elif current_round == "Final":
+                # Check if final has been played (champion crowned)
+                final_match = AppMatch.query.filter_by(round_name="Final").first()
+                if final_match:
+                    champion = Team.query.filter_by(elimination_round='Champion').first()
+                    if champion:
+                        logger.info("=" * 50)
+                        logger.info(f"🏆 TOURNAMENT COMPLETE - {champion.country} ARE WORLD CHAMPIONS! 🏆")
+                        logger.info("=" * 50)
+                        return True, f"Tournament complete! {champion.country} are World Champions!"
+                return False, "Final not yet played"
+            
+            # Standard knockout round advancement (R32, R16, QF)
+            else:
+                if active_teams != config["teams_after"]:
+                    return False, f"{current_round}: {active_teams} teams active (need {config['teams_after']} for next round)"
+                
+                next_round = config["next_round"]
+                
+                logger.info("=" * 50)
+                logger.info(f"{current_round.upper()} COMPLETE - ADVANCING TO {next_round.upper()}")
+                logger.info("=" * 50)
+                
+                success, msg = set_current_round(next_round, force=True)
+                if success:
+                    logger.info(f"✓ Advanced to {next_round}")
+                    return True, f"Advanced to {next_round}"
+                else:
+                    return False, f"Failed to advance: {msg}"
 
 # ============================================
 # MAIN SCRAPER
@@ -605,13 +751,21 @@ class WorldCupScraper:
         
         logger.info(f"Processed {processed} new matches")
         
-        # Check if we should automatically advance to knockout rounds
+        # Check if we should automatically advance rounds
         with app.app_context():
             current_round = get_current_round()
         
         if current_round == "Group Stage":
             logger.info("Checking if group stage is complete for automatic advancement...")
             success, message = self.standings_processor.attempt_automatic_advancement()
+            if success:
+                logger.info(f"✓ Automatic advancement: {message}")
+            else:
+                logger.debug(f"Advancement check: {message}")
+        else:
+            # Check knockout round advancement
+            logger.info(f"Checking if {current_round} is complete for automatic advancement...")
+            success, message = self.standings_processor.attempt_knockout_advancement()
             if success:
                 logger.info(f"✓ Automatic advancement: {message}")
             else:
@@ -638,7 +792,15 @@ class WorldCupScraper:
     def force_advancement_check(self):
         """Force an advancement check (for manual triggering)"""
         logger.info("Forcing advancement check...")
-        success, message = self.standings_processor.attempt_automatic_advancement()
+        
+        with app.app_context():
+            current_round = get_current_round()
+        
+        if current_round == "Group Stage":
+            success, message = self.standings_processor.attempt_automatic_advancement()
+        else:
+            success, message = self.standings_processor.attempt_knockout_advancement()
+        
         logger.info(f"Result: {message}")
         return success
     
