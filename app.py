@@ -286,8 +286,13 @@ def record_match(winner_country, loser_country):
     if loser.eliminated:
         return False, f"{loser_country} has already been eliminated"
     
-    # Get loser's current point value
-    points_earned = loser.current_points
+    # Calculate points earned based on round
+    if current_round == "Group Stage":
+        # In group stage, earn opponent's BASE points (initial seeding value)
+        points_earned = loser.base_points
+    else:
+        # In knockout rounds, earn opponent's CURRENT value (earned points)
+        points_earned = loser.current_points
     
     # Update winner's stats
     winner.total_score += points_earned
@@ -296,17 +301,40 @@ def record_match(winner_country, loser_country):
     # Update loser's stats
     loser.losses += 1
     
-    # In knockout rounds, winner takes loser's point value
-    if current_round not in ["Group Stage", "Third Place", "Final"]:
-        winner.current_points = points_earned
-    
-    # Handle elimination
-    if current_round != "Group Stage":
-        if current_round == "Semi-finals":
-            loser.elimination_round = 'Semi-finals (Available for 3rd Place)'
-        else:
-            loser.eliminated = True
-            loser.elimination_round = current_round
+    # Handle current_points changes based on round
+    if current_round == "Group Stage":
+        # Current points stay as base_points during group stage
+        pass
+    elif current_round == "Semi-finals":
+        # Winner takes loser's point value
+        winner.current_points = loser.current_points
+        # Semi-final loser: reduce current_points to 75% for 3rd place match
+        loser.current_points = int(round(loser.current_points * 0.75))
+        loser.elimination_round = 'Semi-finals (Available for 3rd Place)'
+    elif current_round == "Third Place":
+        # Winner takes loser's point value (the reduced 75% value)
+        winner.current_points = loser.current_points
+        # Both teams get eliminated after 3rd place match
+        winner.elimination_round = '3rd Place (Winner)'
+        loser.eliminated = True
+        loser.elimination_round = '4th Place'
+        loser.current_points = 0
+    elif current_round == "Final":
+        # Winner takes loser's point value
+        winner.current_points = loser.current_points
+        # Mark final results
+        winner.elimination_round = 'Champion'
+        loser.eliminated = True
+        loser.elimination_round = '2nd Place'
+        loser.current_points = 0
+    else:
+        # Regular knockout rounds (R32, R16, QF)
+        # Winner takes loser's point value
+        winner.current_points = loser.current_points
+        # Loser is eliminated
+        loser.eliminated = True
+        loser.elimination_round = current_round
+        loser.current_points = 0
     
     # Record match history
     match_count = Match.query.count()
@@ -326,11 +354,16 @@ def record_match(winner_country, loser_country):
     message += f"Points earned: {points_earned}\n"
     message += f"{winner_country}'s total score: {winner.total_score:.1f}"
     
-    if current_round not in ["Group Stage", "Third Place", "Final"]:
-        message += f"\n{winner_country}'s new point value: {winner.current_points}"
+    if current_round != "Group Stage":
+        message += f"\n{winner_country}'s new current value: {winner.current_points}"
     
     if current_round == "Semi-finals":
-        message += f"\n{loser_country} available for Third Place match"
+        message += f"\n{loser_country} available for Third Place match (value: {loser.current_points})"
+    elif current_round == "Third Place":
+        message += f"\n{winner_country} finishes 3rd, {loser_country} finishes 4th"
+    elif current_round == "Final":
+        message += f"\n🏆 {winner_country} is the CHAMPION! 🏆"
+        message += f"\n{loser_country} finishes 2nd"
     elif current_round != "Group Stage":
         message += f"\n{loser_country} has been ELIMINATED"
     
@@ -357,9 +390,9 @@ def record_draw(team1_country, team2_country):
     if team2.eliminated:
         return False, f"{team2_country} has already been eliminated"
     
-    # Each team gets half of opponent's value
-    team1_earns = team2.current_points / 2
-    team2_earns = team1.current_points / 2
+    # Each team gets half of opponent's BASE points (initial seeding value)
+    team1_earns = team2.base_points / 2
+    team2_earns = team1.base_points / 2
     
     # Update stats
     team1.total_score += team1_earns
@@ -383,8 +416,8 @@ def record_draw(team1_country, team2_country):
     db.session.commit()
     
     message = f"↔ {team1_country} drew with {team2_country}\n"
-    message += f"{team1_country} earned: {team1_earns:.1f} points\n"
-    message += f"{team2_country} earned: {team2_earns:.1f} points"
+    message += f"{team1_country} earned: {team1_earns:.1f} points (half of {team2_country}'s {team2.base_points} base)\n"
+    message += f"{team2_country} earned: {team2_earns:.1f} points (half of {team1_country}'s {team1.base_points} base)"
     
     return True, message
 
@@ -449,30 +482,116 @@ def undo_last_match():
         winner.wins -= 1
         loser.losses -= 1
         
-        # Restore point values for knockout rounds
-        if last_match.round_name not in ["Group Stage", "Third Place", "Final"]:
-            # Find previous match winner won to restore point value
+        round_name = last_match.round_name
+        
+        if round_name == "Group Stage":
+            # Group stage: no current_points changes needed
+            message = f"↶ Undid: {winner.country} defeated {loser.country}"
+        
+        elif round_name == "Semi-finals":
+            # Restore winner's previous current_points
             prev_match = Match.query.filter(
                 Match.winner_id == winner.id,
-                Match.id < last_match.id
+                Match.id < last_match.id,
+                Match.round_name != "Group Stage"
             ).order_by(Match.id.desc()).first()
             
             if prev_match:
-                winner.current_points = int(prev_match.points_earned)
+                winner.current_points = prev_match.points_earned
             else:
-                winner.current_points = winner.base_points
+                # First knockout match - restore to total_score at end of groups
+                winner.current_points = int(round(winner.total_score))
+            
+            # Restore loser's current_points (undo the 0.75 reduction)
+            # The loser's value before semi was points_earned (what winner took)
+            loser.current_points = last_match.points_earned
+            loser.elimination_round = ''
+            
+            message = f"↶ Undid Semi-final: {winner.country} defeated {loser.country}"
+            message += f"\n{loser.country} restored (value: {loser.current_points})"
         
-        # Restore eliminated team
-        if last_match.round_name != "Group Stage":
-            if last_match.round_name == "Semi-finals":
-                loser.elimination_round = ''
+        elif round_name == "Third Place":
+            # Restore winner's previous current_points (the 0.75 reduced value from semi loss)
+            # Need to figure out what it was - it was 0.75 * their value going into semis
+            # The points they earned = loser's 0.75 value, so winner's was similar
+            # Actually, we need to find their semi-final match to restore properly
+            semi_match = Match.query.filter(
+                ((Match.team1_id == winner.id) | (Match.team2_id == winner.id)),
+                Match.round_name == "Semi-finals"
+            ).first()
+            
+            if semi_match:
+                # Winner of 3rd place was a semi-final loser
+                # Their value going into 3rd place was 0.75 * their semi value
+                # Their semi value = points_earned in that match (what the semi winner took)
+                winner.current_points = int(round(semi_match.points_earned * 0.75)) if semi_match.winner_id != winner.id else semi_match.points_earned
+            
+            # Restore loser similarly
+            semi_match_loser = Match.query.filter(
+                ((Match.team1_id == loser.id) | (Match.team2_id == loser.id)),
+                Match.round_name == "Semi-finals"
+            ).first()
+            
+            if semi_match_loser:
+                loser.current_points = int(round(semi_match_loser.points_earned * 0.75)) if semi_match_loser.winner_id != loser.id else semi_match_loser.points_earned
+            
+            winner.elimination_round = 'Semi-finals (Available for 3rd Place)'
+            loser.eliminated = False
+            loser.elimination_round = 'Semi-finals (Available for 3rd Place)'
+            
+            message = f"↶ Undid Third Place match: {winner.country} vs {loser.country}"
+            message += f"\nBoth teams restored for Third Place match"
+        
+        elif round_name == "Final":
+            # Restore winner's previous current_points
+            prev_match = Match.query.filter(
+                Match.winner_id == winner.id,
+                Match.id < last_match.id,
+                Match.round_name != "Group Stage"
+            ).order_by(Match.id.desc()).first()
+            
+            if prev_match:
+                winner.current_points = prev_match.points_earned
+            
+            # Restore loser
+            prev_match_loser = Match.query.filter(
+                Match.winner_id == loser.id,
+                Match.id < last_match.id,
+                Match.round_name != "Group Stage"
+            ).order_by(Match.id.desc()).first()
+            
+            if prev_match_loser:
+                loser.current_points = prev_match_loser.points_earned
+            
+            winner.elimination_round = ''
+            loser.eliminated = False
+            loser.elimination_round = ''
+            
+            message = f"↶ Undid Final: {winner.country} vs {loser.country}"
+            message += f"\nBoth teams restored for Final"
+        
+        else:
+            # Regular knockout rounds (R32, R16, QF)
+            # Restore winner's previous current_points
+            prev_match = Match.query.filter(
+                Match.winner_id == winner.id,
+                Match.id < last_match.id,
+                Match.round_name != "Group Stage"
+            ).order_by(Match.id.desc()).first()
+            
+            if prev_match:
+                winner.current_points = prev_match.points_earned
             else:
-                loser.eliminated = False
-                loser.elimination_round = ''
-        
-        message = f"↶ Undid: {winner.country} defeated {loser.country}"
-        if last_match.round_name != "Group Stage":
-            message += f"\n{loser.country} restored to tournament"
+                # First knockout match - restore to total_score at end of groups
+                winner.current_points = int(round(winner.total_score))
+            
+            # Restore loser's current_points (what the winner earned = loser's value)
+            loser.current_points = last_match.points_earned
+            loser.eliminated = False
+            loser.elimination_round = ''
+            
+            message = f"↶ Undid: {winner.country} defeated {loser.country}"
+            message += f"\n{loser.country} restored to tournament (value: {loser.current_points})"
     
     db.session.delete(last_match)
     db.session.commit()
