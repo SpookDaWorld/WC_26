@@ -315,7 +315,8 @@ def record_match(winner_country, loser_country):
         # Winner takes loser's point value (the reduced 75% value)
         winner.current_points = loser.current_points
         # Both teams get eliminated after 3rd place match
-        winner.elimination_round = '3rd Place (Winner)'
+        winner.eliminated = True
+        winner.elimination_round = '3rd Place'
         loser.eliminated = True
         loser.elimination_round = '4th Place'
         loser.current_points = 0
