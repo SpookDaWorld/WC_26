@@ -211,13 +211,23 @@
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">Create Your Selection</h3>
+            {% if not tournament_locked %}
             <div>
                 <span style="color: var(--text-secondary);">Selected: </span>
                 <span class="selection-count" id="selectionCount">0</span>
                 <span style="color: var(--text-secondary);"> / 4</span>
             </div>
+            {% endif %}
         </div>
         
+        {% if tournament_locked %}
+        <div style="text-align: center; padding: 2rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
+            <h3 style="color: var(--accent); font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; margin-bottom: 0.5rem;">Selections Locked</h3>
+            <p style="color: var(--text-secondary);">The tournament has started. Team selections are no longer available.</p>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 1rem;">Check out the leaderboard to see how participants are doing!</p>
+        </div>
+        {% else %}
         <form id="selectionForm">
             <div class="form-group">
                 <label class="form-label">Your Name <span style="color: var(--text-secondary); font-size: 0.8rem;">(max 20 characters, letters and numbers only)</span></label>
@@ -252,6 +262,7 @@
         </form>
         
         <div id="formMessage" style="margin-top: 1rem; display: none;"></div>
+        {% endif %}
     </div>
 
     <!-- Leaderboard -->

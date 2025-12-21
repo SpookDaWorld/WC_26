@@ -961,12 +961,16 @@ def user_competition():
     # Check if admin is logged in
     is_admin = session.get('admin_logged_in', False)
     
+    # Check if tournament has started (selections locked)
+    tournament_locked = Match.query.count() > 0
+    
     return render_template('user_competition.html',
                           selections=selection_data,
                           all_teams=all_teams,
                           teams_by_group=teams_by_group,
                           sorted_groups=sorted_groups,
                           is_admin=is_admin,
+                          tournament_locked=tournament_locked,
                           current_round=get_current_round())
 
 
@@ -974,6 +978,12 @@ def user_competition():
 def create_selection():
     """API to create user team selection"""
     import re
+    
+    # Check if tournament has started (any matches played)
+    match_count = Match.query.count()
+    if match_count > 0:
+        return jsonify({'success': False, 'message': 'Team selection is locked - the tournament has already started'}), 400
+    
     data = request.json
     user_name = data.get('user_name', '').strip()
     team_ids = data.get('team_ids', [])
