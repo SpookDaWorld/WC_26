@@ -67,7 +67,7 @@ class Team(db.Model):
     confederation = db.Column(db.String(20))
     group = db.Column(db.String(1))  # Group A-L
     base_points = db.Column(db.Integer)
-    current_points = db.Column(db.Integer)
+    current_points = db.Column(db.Float)  # Float to support half points from draws
     total_score = db.Column(db.Float, default=0.0)
     wins = db.Column(db.Integer, default=0)
     draws = db.Column(db.Integer, default=0)
@@ -333,7 +333,7 @@ def record_match(winner_country, loser_country):
         # Winner takes loser's point value
         winner.current_points = loser.current_points
         # Semi-final loser: reduce current_points to 75% for 3rd place match
-        loser.current_points = int(round(loser.current_points * 0.75))
+        loser.current_points = loser.current_points * 0.75
         loser.elimination_round = 'Semi-finals (Available for 3rd Place)'
     elif current_round == "Third Place":
         # Winner takes loser's point value (the reduced 75% value)
@@ -478,8 +478,8 @@ def advance_to_knockout(advancing_countries):
             team.eliminated = True
             team.elimination_round = 'Group Stage'
         else:
-            # Update point value to total score
-            team.current_points = max(1, int(round(team.total_score)))
+            # Update point value to total score (preserve decimals)
+            team.current_points = max(1.0, team.total_score)
     
     set_current_round("Round of 32", force=True)  # Force because we just set the team count
     db.session.commit()
@@ -536,7 +536,7 @@ def undo_last_match():
                 winner.current_points = prev_match.points_earned
             else:
                 # First knockout match - restore to total_score at end of groups
-                winner.current_points = int(round(winner.total_score))
+                winner.current_points = winner.total_score
             
             # Restore loser's current_points (undo the 0.75 reduction)
             # The loser's value before semi was points_earned (what winner took)
@@ -560,7 +560,7 @@ def undo_last_match():
                 # Winner of 3rd place was a semi-final loser
                 # Their value going into 3rd place was 0.75 * their semi value
                 # Their semi value = points_earned in that match (what the semi winner took)
-                winner.current_points = int(round(semi_match.points_earned * 0.75)) if semi_match.winner_id != winner.id else semi_match.points_earned
+                winner.current_points = semi_match.points_earned * 0.75 if semi_match.winner_id != winner.id else semi_match.points_earned
             
             # Restore loser similarly
             semi_match_loser = Match.query.filter(
@@ -569,7 +569,7 @@ def undo_last_match():
             ).first()
             
             if semi_match_loser:
-                loser.current_points = int(round(semi_match_loser.points_earned * 0.75)) if semi_match_loser.winner_id != loser.id else semi_match_loser.points_earned
+                loser.current_points = semi_match_loser.points_earned * 0.75 if semi_match_loser.winner_id != loser.id else semi_match_loser.points_earned
             
             winner.elimination_round = 'Semi-finals (Available for 3rd Place)'
             loser.eliminated = False
@@ -619,7 +619,7 @@ def undo_last_match():
                 winner.current_points = prev_match.points_earned
             else:
                 # First knockout match - restore to total_score at end of groups
-                winner.current_points = int(round(winner.total_score))
+                winner.current_points = winner.total_score
             
             # Restore loser's current_points (what the winner earned = loser's value)
             loser.current_points = last_match.points_earned

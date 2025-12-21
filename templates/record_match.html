@@ -23,7 +23,7 @@
                 <select name="winner" class="form-select" required>
                     <option value="">Select winning team...</option>
                     {% for team in active_teams %}
-                    <option value="{{ team.country }}">{{ team.country }} ({{ team.current_points }} pts)</option>
+                    <option value="{{ team.country }}">{{ team.country }} ({{ "%.1f"|format(team.current_points) }} pts)</option>
                     {% endfor %}
                 </select>
             </div>
@@ -33,7 +33,7 @@
                 <select name="loser" class="form-select" required>
                     <option value="">Select losing team...</option>
                     {% for team in active_teams %}
-                    <option value="{{ team.country }}">{{ team.country }} ({{ team.current_points }} pts)</option>
+                    <option value="{{ team.country }}">{{ team.country }} ({{ "%.1f"|format(team.current_points) }} pts)</option>
                     {% endfor %}
                 </select>
             </div>
@@ -72,7 +72,7 @@
                 <select name="team1" class="form-select" required>
                     <option value="">Select team...</option>
                     {% for team in active_teams %}
-                    <option value="{{ team.country }}">{{ team.country }} ({{ team.current_points }} pts)</option>
+                    <option value="{{ team.country }}">{{ team.country }} ({{ "%.1f"|format(team.current_points) }} pts)</option>
                     {% endfor %}
                 </select>
             </div>
@@ -82,7 +82,7 @@
                 <select name="team2" class="form-select" required>
                     <option value="">Select team...</option>
                     {% for team in active_teams %}
-                    <option value="{{ team.country }}">{{ team.country }} ({{ team.current_points }} pts)</option>
+                    <option value="{{ team.country }}">{{ team.country }} ({{ "%.1f"|format(team.current_points) }} pts)</option>
                     {% endfor %}
                 </select>
             </div>
@@ -134,7 +134,7 @@
         <a href="{{ url_for('team_detail', country=team.country) }}" 
            style="background: var(--bg-card); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; color: var(--text-primary); display: inline-flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border);">
             {{ team.country }}
-            <span style="color: var(--accent-gold); font-family: 'Bebas Neue', sans-serif;">{{ team.current_points }}</span>
+            <span style="color: var(--accent-gold); font-family: 'Bebas Neue', sans-serif;">{{ "%.1f"|format(team.current_points) }}</span>
         </a>
         {% endfor %}
     </div>

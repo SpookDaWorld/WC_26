@@ -28,7 +28,7 @@
         <div class="stat-label">Total Score</div>
     </div>
     <div class="stat-card">
-        <div class="stat-value">{{ team.current_points }}</div>
+        <div class="stat-value">{{ "%.1f"|format(team.current_points) }}</div>
         <div class="stat-label">Current Value</div>
     </div>
     <div class="stat-card">
@@ -70,7 +70,7 @@
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                 <span style="color: var(--text-secondary);">Current Point Value</span>
-                <span style="color: var(--accent-gold);">{{ team.current_points }}</span>
+                <span style="color: var(--accent-gold);">{{ "%.1f"|format(team.current_points) }}</span>
             </div>
             <div style="display: flex; justify-content: space-between;">
                 <span style="color: var(--text-secondary);">Total Matches</span>
@@ -97,7 +97,7 @@
         
         <div style="background: var(--gradient-accent); padding: 1rem; border-radius: 8px; text-align: center;">
             <div style="font-size: 0.85rem; opacity: 0.8;">Defeating {{ team.country }} is worth</div>
-            <div style="font-family: 'Bebas Neue', sans-serif; font-size: 2rem;">{{ team.current_points }} POINTS</div>
+            <div style="font-family: 'Bebas Neue', sans-serif; font-size: 2rem;">{{ "%.1f"|format(team.current_points) }} POINTS</div>
         </div>
     </div>
 </div>
