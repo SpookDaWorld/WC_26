@@ -158,6 +158,28 @@ class FootballDataClient:
         today = datetime.utcnow().strftime('%Y-%m-%d')
         tomorrow = (datetime.utcnow() + timedelta(days=1)).strftime('%Y-%m-%d')
         return self.get_matches(date_from=today, date_to=tomorrow)
+    
+    def get_standings(self) -> Optional[dict]:
+        """
+        Get World Cup standings (group tables)
+        
+        Returns dict with structure:
+        {
+            'standings': [
+                {
+                    'stage': 'GROUP_STAGE',
+                    'type': 'TOTAL',
+                    'group': 'GROUP_A',
+                    'table': [
+                        {'position': 1, 'team': {'name': '...'}, 'points': X, ...},
+                        ...
+                    ]
+                },
+                ...
+            ]
+        }
+        """
+        return self._request(f"/competitions/{COMPETITION_CODE}/standings")
 
 # ============================================
 # MATCH PROCESSOR
@@ -331,6 +353,208 @@ class MatchProcessor:
         
         return processed_count
 
+
+# ============================================
+# STANDINGS PROCESSOR
+# ============================================
+
+class StandingsProcessor:
+    """Processes standings data and handles automatic advancement to knockout rounds"""
+    
+    def __init__(self, client: FootballDataClient):
+        self.client = client
+    
+    def get_group_standings(self) -> Optional[Dict[str, List[dict]]]:
+        """
+        Fetch and parse group standings from API
+        
+        Returns:
+            Dict mapping group name to list of teams in order:
+            {'A': [{'name': 'Spain', 'points': 9, 'goalDifference': 5, ...}, ...], ...}
+        """
+        data = self.client.get_standings()
+        
+        if not data or 'standings' not in data:
+            logger.error("Failed to fetch standings data")
+            return None
+        
+        groups = {}
+        
+        for standing in data['standings']:
+            # Only process group stage standings
+            if standing.get('stage') != 'GROUP_STAGE':
+                continue
+            if standing.get('type') != 'TOTAL':
+                continue
+            
+            group_name = standing.get('group', '')
+            # Extract group letter (e.g., 'GROUP_A' -> 'A')
+            if group_name.startswith('GROUP_'):
+                group_letter = group_name.replace('GROUP_', '')
+            else:
+                group_letter = group_name
+            
+            table = standing.get('table', [])
+            teams_in_group = []
+            
+            for entry in table:
+                team_data = entry.get('team', {})
+                team_name = normalize_team_name(team_data.get('name', ''))
+                
+                teams_in_group.append({
+                    'name': team_name,
+                    'position': entry.get('position', 0),
+                    'points': entry.get('points', 0),
+                    'goalDifference': entry.get('goalDifference', 0),
+                    'goalsFor': entry.get('goalsFor', 0),
+                    'playedGames': entry.get('playedGames', 0),
+                    'won': entry.get('won', 0),
+                    'draw': entry.get('draw', 0),
+                    'lost': entry.get('lost', 0)
+                })
+            
+            # Sort by position
+            teams_in_group.sort(key=lambda t: t['position'])
+            groups[group_letter] = teams_in_group
+        
+        return groups
+    
+    def check_group_stage_complete(self, groups: Dict[str, List[dict]]) -> bool:
+        """
+        Check if all group stage matches are complete
+        
+        Each team plays 3 matches in groups, so each group should have
+        all 4 teams with 3 played games each.
+        """
+        if not groups:
+            return False
+        
+        # World Cup 2026 has 12 groups (A-L)
+        expected_groups = 12
+        
+        if len(groups) < expected_groups:
+            logger.info(f"Only {len(groups)} groups found, expected {expected_groups}")
+            return False
+        
+        for group_letter, teams in groups.items():
+            if len(teams) < 4:
+                logger.info(f"Group {group_letter} has only {len(teams)} teams")
+                return False
+            
+            for team in teams:
+                if team['playedGames'] < 3:
+                    logger.info(f"Group {group_letter}: {team['name']} has only played {team['playedGames']} games")
+                    return False
+        
+        return True
+    
+    def determine_advancing_teams(self, groups: Dict[str, List[dict]]) -> List[str]:
+        """
+        Determine which 32 teams advance to knockout rounds.
+        
+        World Cup 2026 format:
+        - Top 2 from each group (12 groups × 2 = 24 teams)
+        - Best 8 third-place teams (based on points, then goal difference, then goals scored)
+        
+        Returns:
+            List of 32 team names that advance
+        """
+        advancing = []
+        third_place_teams = []
+        
+        # Get top 2 from each group + collect 3rd place teams
+        for group_letter in sorted(groups.keys()):
+            teams = groups[group_letter]
+            
+            if len(teams) >= 2:
+                # Top 2 advance automatically
+                advancing.append(teams[0]['name'])
+                advancing.append(teams[1]['name'])
+                logger.info(f"Group {group_letter}: {teams[0]['name']} (1st), {teams[1]['name']} (2nd) advance")
+            
+            if len(teams) >= 3:
+                # Collect 3rd place team for comparison
+                third_place_teams.append({
+                    'name': teams[2]['name'],
+                    'group': group_letter,
+                    'points': teams[2]['points'],
+                    'goalDifference': teams[2]['goalDifference'],
+                    'goalsFor': teams[2]['goalsFor']
+                })
+        
+        # Sort 3rd place teams by: points (desc), goal difference (desc), goals scored (desc)
+        third_place_teams.sort(
+            key=lambda t: (t['points'], t['goalDifference'], t['goalsFor']),
+            reverse=True
+        )
+        
+        # Take best 8 third-place teams
+        best_third = third_place_teams[:8]
+        for team in best_third:
+            advancing.append(team['name'])
+            logger.info(f"Group {team['group']} 3rd place: {team['name']} advances (pts: {team['points']}, gd: {team['goalDifference']})")
+        
+        # Log teams that didn't make it
+        eliminated_third = third_place_teams[8:]
+        for team in eliminated_third:
+            logger.info(f"Group {team['group']} 3rd place: {team['name']} ELIMINATED (pts: {team['points']}, gd: {team['goalDifference']})")
+        
+        return advancing
+    
+    def attempt_automatic_advancement(self) -> Tuple[bool, str]:
+        """
+        Check if group stage is complete and automatically advance teams if so.
+        
+        Returns:
+            Tuple of (success, message)
+        """
+        with app.app_context():
+            current_round = get_current_round()
+            
+            if current_round != "Group Stage":
+                return False, f"Not in Group Stage (current: {current_round})"
+            
+            # Check if we already have 72 matches
+            from app import Match as AppMatch
+            group_matches = AppMatch.query.filter_by(round_name="Group Stage").count()
+            
+            if group_matches < 72:
+                return False, f"Only {group_matches}/72 group stage matches recorded"
+        
+        # Fetch standings from API
+        logger.info("Fetching standings from API...")
+        groups = self.get_group_standings()
+        
+        if not groups:
+            return False, "Failed to fetch standings from API"
+        
+        # Check if all groups are complete
+        if not self.check_group_stage_complete(groups):
+            return False, "Group stage not yet complete"
+        
+        # Determine advancing teams
+        advancing = self.determine_advancing_teams(groups)
+        
+        if len(advancing) != 32:
+            return False, f"Expected 32 advancing teams, got {len(advancing)}"
+        
+        # Perform the advancement
+        logger.info("=" * 50)
+        logger.info("GROUP STAGE COMPLETE - ADVANCING TO KNOCKOUT")
+        logger.info("=" * 50)
+        
+        with app.app_context():
+            from app import advance_to_knockout
+            success, message = advance_to_knockout(advancing)
+            
+            if success:
+                logger.info("✓ Successfully advanced to Round of 32!")
+                logger.info(f"  {len(advancing)} teams advancing")
+            else:
+                logger.error(f"Failed to advance: {message}")
+            
+            return success, message
+
 # ============================================
 # MAIN SCRAPER
 # ============================================
@@ -341,6 +565,7 @@ class WorldCupScraper:
     def __init__(self, api_key: str):
         self.client = FootballDataClient(api_key)
         self.processor = MatchProcessor()
+        self.standings_processor = StandingsProcessor(self.client)
         self.running = False
     
     def check_api_connection(self) -> bool:
@@ -379,7 +604,43 @@ class WorldCupScraper:
         processed = self.processor.process_all_finished_matches(matches)
         
         logger.info(f"Processed {processed} new matches")
+        
+        # Check if we should automatically advance to knockout rounds
+        with app.app_context():
+            current_round = get_current_round()
+        
+        if current_round == "Group Stage":
+            logger.info("Checking if group stage is complete for automatic advancement...")
+            success, message = self.standings_processor.attempt_automatic_advancement()
+            if success:
+                logger.info(f"✓ Automatic advancement: {message}")
+            else:
+                logger.debug(f"Advancement check: {message}")
+        
         return processed
+    
+    def check_standings(self):
+        """Manually check and display current standings"""
+        logger.info("Fetching current standings...")
+        
+        groups = self.standings_processor.get_group_standings()
+        
+        if not groups:
+            logger.error("Failed to fetch standings")
+            return
+        
+        for group_letter in sorted(groups.keys()):
+            teams = groups[group_letter]
+            logger.info(f"\nGroup {group_letter}:")
+            for team in teams:
+                logger.info(f"  {team['position']}. {team['name']} - {team['points']} pts (GD: {team['goalDifference']}, P: {team['playedGames']})")
+    
+    def force_advancement_check(self):
+        """Force an advancement check (for manual triggering)"""
+        logger.info("Forcing advancement check...")
+        success, message = self.standings_processor.attempt_automatic_advancement()
+        logger.info(f"Result: {message}")
+        return success
     
     def run_continuous(self):
         """Run continuously, polling for updates"""
@@ -487,6 +748,8 @@ def main():
     parser.add_argument('--once', action='store_true', help='Run once and exit')
     parser.add_argument('--verify', action='store_true', help='Verify team name mappings')
     parser.add_argument('--upcoming', action='store_true', help='Show upcoming matches')
+    parser.add_argument('--standings', action='store_true', help='Show current group standings')
+    parser.add_argument('--advance', action='store_true', help='Force advancement check')
     parser.add_argument('--api-key', type=str, help='Football-Data.org API key')
     
     args = parser.parse_args()
@@ -515,6 +778,10 @@ def main():
         verify_team_mapping()
     elif args.upcoming:
         show_upcoming_matches()
+    elif args.standings:
+        scraper.check_standings()
+    elif args.advance:
+        scraper.force_advancement_check()
     elif args.once:
         scraper.run_once()
     else:
