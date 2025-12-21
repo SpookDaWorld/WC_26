@@ -200,6 +200,17 @@ class UserTeamSelection(db.Model):
 ROUNDS = ["Group Stage", "Round of 32", "Round of 16", "Quarter-finals", 
           "Semi-finals", "Third Place", "Final"]
 
+# Maximum active teams allowed for each round
+ROUND_TEAM_LIMITS = {
+    "Group Stage": 48,      # All teams active
+    "Round of 32": 32,      # 32 teams advance from groups
+    "Round of 16": 16,      # 16 teams remain
+    "Quarter-finals": 8,    # 8 teams remain
+    "Semi-finals": 4,       # 4 teams remain
+    "Third Place": 4,       # 2 semi-final losers + 2 finalists (losers not eliminated yet)
+    "Final": 2              # 2 teams remain (after 3rd place match)
+}
+
 
 def get_current_round():
     """Get current tournament round"""
@@ -209,8 +220,19 @@ def get_current_round():
     return "Group Stage"
 
 
-def set_current_round(round_name):
-    """Set current tournament round"""
+def set_current_round(round_name, force=False):
+    """Set current tournament round with validation"""
+    if round_name not in ROUNDS:
+        return False, f"Invalid round: {round_name}"
+    
+    # Check team count unless forced (used internally)
+    if not force:
+        active_count = Team.query.filter_by(eliminated=False).count()
+        max_allowed = ROUND_TEAM_LIMITS.get(round_name, 48)
+        
+        if active_count > max_allowed:
+            return False, f"Cannot advance to {round_name}: {active_count} teams still active, maximum allowed is {max_allowed}"
+    
     state = TournamentState.query.first()
     if not state:
         state = TournamentState(current_round=round_name)
@@ -219,6 +241,8 @@ def set_current_round(round_name):
         state.current_round = round_name
         state.last_updated = datetime.utcnow()
     db.session.commit()
+    
+    return True, f"Round set to {round_name}"
 
 
 def calculate_starting_points(tournament_rank):
@@ -430,6 +454,17 @@ def advance_to_knockout(advancing_countries):
     if current_round != "Group Stage":
         return False, "Can only advance to knockout from Group Stage"
     
+    # Check that all 72 group stage matches have been played (6 matches per group × 12 groups)
+    REQUIRED_GROUP_MATCHES = 72
+    group_matches_played = Match.query.filter_by(round_name="Group Stage").count()
+    
+    if group_matches_played < REQUIRED_GROUP_MATCHES:
+        return False, f"Cannot advance to knockout: Only {group_matches_played} of {REQUIRED_GROUP_MATCHES} group stage matches have been played"
+    
+    # Verify exactly 32 teams are advancing
+    if len(advancing_countries) != 32:
+        return False, f"Exactly 32 teams must advance to knockout rounds (got {len(advancing_countries)})"
+    
     # Verify all teams exist
     for country in advancing_countries:
         team = Team.query.filter_by(country=country).first()
@@ -446,7 +481,7 @@ def advance_to_knockout(advancing_countries):
             # Update point value to total score
             team.current_points = max(1, int(round(team.total_score)))
     
-    set_current_round("Round of 32")
+    set_current_round("Round of 32", force=True)  # Force because we just set the team count
     db.session.commit()
     
     eliminated_count = len(all_teams) - len(advancing_countries)
@@ -1033,8 +1068,11 @@ def admin_set_round():
     """Set tournament round"""
     round_name = request.form.get('round')
     if round_name in ROUNDS:
-        set_current_round(round_name)
-        flash(f'Round set to: {round_name}', 'success')
+        success, message = set_current_round(round_name)
+        if success:
+            flash(f'Round set to: {round_name}', 'success')
+        else:
+            flash(message, 'error')
     else:
         flash('Invalid round name', 'error')
     return redirect(url_for('admin_dashboard'))

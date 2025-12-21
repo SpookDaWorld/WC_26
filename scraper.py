@@ -282,8 +282,12 @@ class MatchProcessor:
         
         if match_round in rounds_order and current_round in rounds_order:
             if rounds_order.index(match_round) > rounds_order.index(current_round):
-                logger.info(f"Advancing round from {current_round} to {match_round}")
-                set_current_round(match_round)
+                logger.info(f"Attempting to advance round from {current_round} to {match_round}")
+                success, msg = set_current_round(match_round)
+                if success:
+                    logger.info(f"Advanced round to {match_round}")
+                else:
+                    logger.warning(f"Could not advance round: {msg}")
         
         # Record the match
         with app.app_context():
