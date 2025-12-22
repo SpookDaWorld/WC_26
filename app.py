@@ -156,12 +156,21 @@ class Match(db.Model):
     points_earned = db.Column(db.Float)
     team1_earned = db.Column(db.Float, nullable=True)
     team2_earned = db.Column(db.Float, nullable=True)
+    # Match scores
+    team1_score = db.Column(db.Integer, nullable=True)  # Goals scored by team1
+    team2_score = db.Column(db.Integer, nullable=True)  # Goals scored by team2
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     
     team1 = db.relationship('Team', foreign_keys=[team1_id], backref='matches_as_team1')
     team2 = db.relationship('Team', foreign_keys=[team2_id], backref='matches_as_team2')
     winner = db.relationship('Team', foreign_keys=[winner_id], backref='matches_won')
-
+    
+    @property
+    def score_display(self):
+        """Return formatted score string like '2-1' or None if no score"""
+        if self.team1_score is not None and self.team2_score is not None:
+            return f"{self.team1_score}-{self.team2_score}"
+        return None
 
 class TournamentState(db.Model):
     """Stores global tournament state"""
@@ -293,8 +302,8 @@ def initialize_teams():
     return len(merged_df)
 
 
-def record_match(winner_country, loser_country):
-    """Record a match result"""
+def record_match(winner_country, loser_country, winner_score=None, loser_score=None):
+    """Record a match result with optional score"""
     current_round = get_current_round()
     
     winner = Team.query.filter_by(country=winner_country).first()
@@ -370,12 +379,18 @@ def record_match(winner_country, loser_country):
         team1_id=winner.id,
         team2_id=loser.id,
         winner_id=winner.id,
-        points_earned=points_earned
+        points_earned=points_earned,
+        team1_score=winner_score,
+        team2_score=loser_score
     )
     db.session.add(match)
     db.session.commit()
     
-    message = f"✓ {winner_country} defeated {loser_country}\n"
+    # Build message with score if provided
+    if winner_score is not None and loser_score is not None:
+        message = f"✓ {winner_country} {winner_score}-{loser_score} {loser_country}\n"
+    else:
+        message = f"✓ {winner_country} defeated {loser_country}\n"
     message += f"Points earned: {points_earned}\n"
     message += f"{winner_country}'s total score: {winner.total_score:.1f}"
     
@@ -395,8 +410,8 @@ def record_match(winner_country, loser_country):
     return True, message
 
 
-def record_draw(team1_country, team2_country):
-    """Record a draw (group stage only)"""
+def record_draw(team1_country, team2_country, team1_score=None, team2_score=None):
+    """Record a draw (group stage only) with optional score"""
     current_round = get_current_round()
     
     if current_round != "Group Stage":
@@ -435,12 +450,18 @@ def record_draw(team1_country, team2_country):
         team1_id=team1.id,
         team2_id=team2.id,
         team1_earned=team1_earns,
-        team2_earned=team2_earns
+        team2_earned=team2_earns,
+        team1_score=team1_score,
+        team2_score=team2_score
     )
     db.session.add(match)
     db.session.commit()
     
-    message = f"↔ {team1_country} drew with {team2_country}\n"
+    # Build message with score if provided
+    if team1_score is not None and team2_score is not None:
+        message = f"↔ {team1_country} {team1_score}-{team2_score} {team2_country}\n"
+    else:
+        message = f"↔ {team1_country} drew with {team2_country}\n"
     message += f"{team1_country} earned: {team1_earns:.1f} points (half of {team2_country}'s {team2.base_points} base)\n"
     message += f"{team2_country} earned: {team2_earns:.1f} points (half of {team1_country}'s {team1.base_points} base)"
     
@@ -921,6 +942,52 @@ def statistics():
                           score_distribution=score_distribution,
                           conf_chart=conf_chart,
                           current_round=get_current_round())
+
+
+@app.route('/api/top-scorers')
+def api_top_scorers():
+    """API endpoint to fetch top scorers from Football-Data.org"""
+    import requests
+    
+    api_key = os.environ.get('FOOTBALL_DATA_API_KEY', '')
+    
+    if not api_key:
+        return jsonify({'success': False, 'error': 'API key not configured'}), 500
+    
+    try:
+        headers = {'X-Auth-Token': api_key}
+        response = requests.get(
+            'https://api.football-data.org/v4/competitions/WC/scorers',
+            headers=headers,
+            params={'limit': 20},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            scorers = data.get('scorers', [])
+            
+            # Format the data
+            formatted_scorers = []
+            for scorer in scorers:
+                player = scorer.get('player', {})
+                team = scorer.get('team', {})
+                formatted_scorers.append({
+                    'name': player.get('name', 'Unknown'),
+                    'nationality': player.get('nationality', ''),
+                    'team': team.get('name', 'Unknown'),
+                    'goals': scorer.get('goals', 0),
+                    'assists': scorer.get('assists'),
+                    'penalties': scorer.get('penalties', 0),
+                    'matches_played': scorer.get('playedMatches', 0)
+                })
+            
+            return jsonify({'success': True, 'scorers': formatted_scorers})
+        else:
+            return jsonify({'success': False, 'error': f'API error: {response.status_code}'}), response.status_code
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/user-competition')

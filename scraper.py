@@ -180,6 +180,33 @@ class FootballDataClient:
         }
         """
         return self._request(f"/competitions/{COMPETITION_CODE}/standings")
+    
+    def get_scorers(self, limit: int = 20) -> Optional[List[dict]]:
+        """
+        Get top scorers for the World Cup
+        
+        Args:
+            limit: Maximum number of scorers to return (default 20)
+        
+        Returns:
+            List of scorer data:
+            [
+                {
+                    'player': {'id': X, 'name': '...', 'nationality': '...'},
+                    'team': {'id': X, 'name': '...'},
+                    'goals': X,
+                    'assists': X,  # May be None on free tier
+                    'penalties': X
+                },
+                ...
+            ]
+        """
+        params = {'limit': limit}
+        data = self._request(f"/competitions/{COMPETITION_CODE}/scorers", params)
+        
+        if data and 'scorers' in data:
+            return data['scorers']
+        return None
 
 # ============================================
 # MATCH PROCESSOR
@@ -294,6 +321,16 @@ class MatchProcessor:
             logger.warning(f"Could not determine result for match {match_id}")
             return False
         
+        # Extract scores
+        score = match.get('score', {})
+        full_time = score.get('fullTime', {})
+        home_score = full_time.get('home')
+        away_score = full_time.get('away')
+        
+        # Get team names for determining which score belongs to which team
+        home_team = normalize_team_name(match['homeTeam']['name'])
+        away_team = normalize_team_name(match['awayTeam']['name'])
+        
         # Determine and set the round
         match_round = self._determine_round(match)
         current_round = get_current_round()
@@ -311,13 +348,20 @@ class MatchProcessor:
                 else:
                     logger.warning(f"Could not advance round: {msg}")
         
-        # Record the match
+        # Record the match with scores
         with app.app_context():
             if is_draw:
-                success, message = record_draw(winner, loser)  # winner/loser are team1/team2 for draws
+                # For draws, winner/loser are team1/team2
+                # team1 is home, team2 is away
+                success, message = record_draw(winner, loser, home_score, away_score)
                 result_type = "draw"
             else:
-                success, message = record_match(winner, loser)
+                # Determine winner and loser scores
+                if winner == home_team:
+                    winner_score, loser_score = home_score, away_score
+                else:
+                    winner_score, loser_score = away_score, home_score
+                success, message = record_match(winner, loser, winner_score, loser_score)
                 result_type = "win"
             
             if success:

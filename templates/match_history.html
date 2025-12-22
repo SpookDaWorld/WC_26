@@ -16,12 +16,21 @@
             <span class="match-round" style="min-width: 120px;">{{ match.round_name }}</span>
             
             {% if match.match_type == 'win' %}
+                {% set loser = match.team2 if match.team1_id == match.winner_id else match.team1 %}
                 <strong style="color: var(--accent-green);">{{ match.winner.country }}</strong>
-                <span class="match-vs">defeated</span>
-                <span>{{ match.team2.country if match.team1_id == match.winner_id else match.team1.country }}</span>
+                {% if match.score_display %}
+                    <span class="match-score" style="font-family: 'Bebas Neue', sans-serif; color: var(--accent-gold); margin: 0 0.5rem;">{{ match.score_display }}</span>
+                {% else %}
+                    <span class="match-vs">defeated</span>
+                {% endif %}
+                <span>{{ loser.country }}</span>
             {% else %}
                 <span>{{ match.team1.country }}</span>
-                <span class="match-vs">drew with</span>
+                {% if match.score_display %}
+                    <span class="match-score" style="font-family: 'Bebas Neue', sans-serif; color: var(--accent-gold); margin: 0 0.5rem;">{{ match.score_display }}</span>
+                {% else %}
+                    <span class="match-vs">drew with</span>
+                {% endif %}
                 <span>{{ match.team2.country }}</span>
             {% endif %}
         </div>

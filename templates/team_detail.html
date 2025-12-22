@@ -114,17 +114,33 @@
             <div class="match-teams">
                 <span class="match-round" style="min-width: 120px;">{{ match.round_name }}</span>
                 
+                {% set opponent = match.team2 if match.team1_id == team.id else match.team1 %}
                 {% if match.match_type == 'win' %}
                     {% if match.winner_id == team.id %}
-                        <span style="color: var(--accent-green);">✓ Won vs</span>
-                        <span>{{ match.team2.country if match.team1_id == team.id else match.team1.country }}</span>
+                        <span style="color: var(--accent-green);">✓ Won</span>
+                        {% if match.score_display %}
+                            <span style="font-family: 'Bebas Neue', sans-serif; color: var(--accent-gold);">{{ match.score_display }}</span>
+                        {% else %}
+                            <span>vs</span>
+                        {% endif %}
+                        <span>{{ opponent.country }}</span>
                     {% else %}
-                        <span style="color: var(--accent);">✗ Lost to</span>
+                        <span style="color: var(--accent);">✗ Lost</span>
+                        {% if match.score_display %}
+                            <span style="font-family: 'Bebas Neue', sans-serif; color: var(--accent-gold);">{{ match.team2_score }}-{{ match.team1_score if match.team1_id == team.id else match.team2_score }}</span>
+                        {% else %}
+                            <span>to</span>
+                        {% endif %}
                         <span>{{ match.winner.country }}</span>
                     {% endif %}
                 {% else %}
-                    <span style="color: var(--accent-gold);">↔ Drew with</span>
-                    <span>{{ match.team2.country if match.team1_id == team.id else match.team1.country }}</span>
+                    <span style="color: var(--accent-gold);">↔ Drew</span>
+                    {% if match.score_display %}
+                        <span style="font-family: 'Bebas Neue', sans-serif; color: var(--accent-gold);">{{ match.score_display }}</span>
+                    {% else %}
+                        <span>with</span>
+                    {% endif %}
+                    <span>{{ opponent.country }}</span>
                 {% endif %}
             </div>
             

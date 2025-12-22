@@ -2,10 +2,97 @@
 
 {% block title %}Statistics - World Cup 2026 Scorer{% endblock %}
 
+{% block extra_css %}
+<style>
+    .scorer-row {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border);
+        gap: 1rem;
+    }
+    
+    .scorer-row:last-child {
+        border-bottom: none;
+    }
+    
+    .scorer-rank {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.5rem;
+        color: var(--accent-gold);
+        width: 2rem;
+        text-align: center;
+    }
+    
+    .scorer-rank.top-3 {
+        color: var(--accent);
+    }
+    
+    .scorer-info {
+        flex: 1;
+    }
+    
+    .scorer-name {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .scorer-team {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    
+    .scorer-goals {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 2rem;
+        color: var(--accent-green);
+    }
+    
+    .scorer-details {
+        text-align: right;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+    
+    .scorers-loading {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-secondary);
+    }
+    
+    .scorers-error {
+        text-align: center;
+        padding: 2rem;
+        color: var(--accent);
+    }
+    
+    .scorers-container {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <h2>Tournament Statistics</h2>
     <p>Charts and analysis of tournament performance</p>
+</div>
+
+<!-- Top Scorers Section -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">👟 Golden Boot Watchlist</h3>
+        <button id="refreshScorers" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.85rem;">
+            Refresh
+        </button>
+    </div>
+    
+    <div id="scorersContainer" class="scorers-container">
+        <div class="scorers-loading">
+            <p>Loading top scorers...</p>
+        </div>
+    </div>
 </div>
 
 <div class="grid grid-2">
@@ -81,6 +168,54 @@
 
 {% block extra_js %}
 <script>
+    // Top Scorers functionality
+    async function loadTopScorers() {
+        const container = document.getElementById('scorersContainer');
+        container.innerHTML = '<div class="scorers-loading"><p>Loading top scorers...</p></div>';
+        
+        try {
+            const response = await fetch('/api/top-scorers');
+            const data = await response.json();
+            
+            if (data.success && data.scorers.length > 0) {
+                let html = '';
+                data.scorers.forEach((scorer, index) => {
+                    const rankClass = index < 3 ? 'top-3' : '';
+                    const assists = scorer.assists !== null ? scorer.assists : '-';
+                    const penalties = scorer.penalties || 0;
+                    
+                    html += `
+                        <div class="scorer-row">
+                            <div class="scorer-rank ${rankClass}">${index + 1}</div>
+                            <div class="scorer-info">
+                                <div class="scorer-name">${scorer.name}</div>
+                                <div class="scorer-team">${scorer.team}</div>
+                            </div>
+                            <div class="scorer-details">
+                                ${penalties > 0 ? `<div>${penalties} pen</div>` : ''}
+                                ${assists !== '-' ? `<div>${assists} ast</div>` : ''}
+                            </div>
+                            <div class="scorer-goals">${scorer.goals}</div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } else if (data.success && data.scorers.length === 0) {
+                container.innerHTML = '<div class="scorers-loading"><p>No scorers data available yet. Check back once the tournament starts!</p></div>';
+            } else {
+                container.innerHTML = `<div class="scorers-error"><p>Could not load scorers: ${data.error || 'Unknown error'}</p></div>`;
+            }
+        } catch (error) {
+            container.innerHTML = `<div class="scorers-error"><p>Failed to load top scorers. The tournament may not have started yet.</p></div>`;
+        }
+    }
+    
+    // Load scorers on page load
+    loadTopScorers();
+    
+    // Refresh button
+    document.getElementById('refreshScorers').addEventListener('click', loadTopScorers);
+    
     // Color scheme for confederations
     const confColors = {
         'UEFA': '#1e3a8a',
