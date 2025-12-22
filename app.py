@@ -1253,22 +1253,38 @@ def api_match_history():
 def check_and_migrate_db():
     """Check if database schema needs updating and migrate if necessary"""
     with app.app_context():
-        # Check if 'group' column exists in team table
         try:
             from sqlalchemy import inspect
             inspector = inspect(db.engine)
-            columns = [col['name'] for col in inspector.get_columns('team')]
             
-            if 'group' not in columns:
-                print("Database schema outdated - adding 'group' column...")
-                # Add the group column
+            # Check team table columns
+            team_columns = [col['name'] for col in inspector.get_columns('team')]
+            
+            if 'group' not in team_columns:
+                print("Database schema outdated - adding 'group' column to team...")
                 with db.engine.connect() as conn:
                     conn.execute(db.text('ALTER TABLE team ADD COLUMN "group" VARCHAR(1)'))
                     conn.commit()
-                print("Migration complete!")
-                
-                # Update existing teams with group data from CSV
+                print("Added 'group' column!")
                 update_team_groups()
+            
+            # Check match table columns for score fields
+            if 'match' in inspector.get_table_names():
+                match_columns = [col['name'] for col in inspector.get_columns('match')]
+                
+                if 'team1_score' not in match_columns:
+                    print("Adding 'team1_score' column to match table...")
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE "match" ADD COLUMN team1_score INTEGER'))
+                        conn.commit()
+                    print("Added 'team1_score' column!")
+                
+                if 'team2_score' not in match_columns:
+                    print("Adding 'team2_score' column to match table...")
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE "match" ADD COLUMN team2_score INTEGER'))
+                        conn.commit()
+                    print("Added 'team2_score' column!")
                 
         except Exception as e:
             # Table might not exist yet, that's fine
