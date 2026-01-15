@@ -75,7 +75,7 @@ class Team(db.Model):
     eliminated = db.Column(db.Boolean, default=False)
     elimination_round = db.Column(db.String(50), default='')
     
-    @property
+    @property # Need to update with the final 6 teams once they qualify so that the flags all in there
     def flag_code(self):
         """Return ISO country code for flag display"""
         country_codes = {
