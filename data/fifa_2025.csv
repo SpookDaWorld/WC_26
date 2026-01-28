@@ -3,208 +3,208 @@ Rank,Country
 2,Argentina
 3,France
 4,England
-5,Portugal
-6,Netherlands
-7,Brazil
-8,Belgium
-9,Italy
+5,Brazil
+6,Portugal
+7,Netherlands
+8,Morocco
+9,Belgium
 10,Germany
 11,Croatia
-12,Morocco
-13,Colombia
-14,Mexico
-15,Uruguay
-16,United States
-17,Switzerland
-18,Senegal
+12,Senegal
+13,Italy
+14,Colombia
+15,United States
+16,Mexico
+17,Uruguay
+18,Switzerland
 19,Japan
-20,Denmark
-21,Iran
+20,Iran
+21,Denmark
 22,South Korea
 23,Ecuador
 24,Austria
-25,Australia
-26,Türkiye
-27,Ukraine
-28,Canada
-29,Norway
-30,Russia
-31,Panama
-32,Egypt
-33,Poland
-34,Wales
-35,Algeria
-36,Serbia
-37,Hungary
+25,Türkiye
+26,Nigeria
+27,Australia
+28,Algeria
+29,Canada
+30,Ukraine
+31,Egypt
+32,Norway
+33,Panama
+34,Poland
+35,Wales
+36,Russia
+37,Côte d'Ivoire
 38,Scotland
-39,Paraguay
-40,Sweden
-41,Nigeria
-42,Côte d'Ivoire
-43,Tunisia
-44,Czechia
-45,Costa Rica
-46,Slovakia
-47,Romania
-48,Greece
-49,Peru
+39,Serbia
+40,Paraguay
+41,Hungary
+42,Sweden
+43,Czechia
+44,Slovakia
+45,Cameroon
+46,Greece
+47,Tunisia
+48,DR Congo
+49,Romania
 50,Venezuela
-51,Slovenia
-52,Qatar
-53,Mali
-54,Cameroon
-55,Uzbekistan
-56,Chile
-57,Iraq
-58,Saudi Arabia
-59,South Africa
-60,DR Congo
-61,Albania
-62,Ireland
-63,Burkina Faso
-64,Honduras
-65,North Macedonia
-66,Jordan
-67,United Arab Emirates
-68,Jamaica
+51,Costa Rica
+52,Uzbekistan
+53,Peru
+54,Mali
+55,Chile
+56,Qatar
+57,Slovenia
+58,Iraq
+59,Ireland
+60,South Africa
+61,Saudi Arabia
+62,Burkina Faso
+63,Albania
+64,Jordan
+65,Honduras
+66,North Macedonia
+67,Cabo Verde
+68,United Arab Emirates
 69,Northern Ireland
-70,Georgia
-71,Cabo Verde
-72,Finland
-73,Ghana
+70,Jamaica
+71,Bosnia & Herzegovina
+72,Ghana
+73,Georgia
 74,Iceland
-75,Bosnia & Herzegovina
+75,Finland
 76,Bolivia
-77,Gabon
-78,Israel
-79,Oman
+77,Israel
+78,Oman
+79,Kosovo
 80,Guinea
-81,Montenegro
-82,Curacao
-83,Uganda
-84,Kosovo
+81,Curacao
+82,Montenegro
+83,Haiti
+84,Syria
 85,New Zealand
-86,Syria
-87,Zambia
-88,Haiti
+86,Gabon
+87,Bulgaria
+88,Uganda
 89,Angola
 90,Bahrain
-91,Bulgaria
+91,Zambia
 92,Benin
 93,China
-94,El Salvador
-95,Guatemala
+94,Guatemala
+95,Palestine
 96,Thailand
-97,Luxembourg
-98,Palestine
-99,Equatorial Guinea
-100,Trinidad and Tobago
+97,Trinidad and Tobago
+98,Belarus
+99,El Salvador
+100,Tajikistan
 101,Mozambique
-102,Tajikistan
-103,Belarus
-104,Armenia
-105,Kyrgyzstan
-106,Madagascar
-107,Tanzania
-108,Niger
-109,Kenya
-110,Lebanon
-111,Vietnam
-112,Comoros
-113,Mauritania
-114,Libya
-115,Kazakhstan
-116,Namibia
-117,Gambia
-118,Malaysia
-119,Sudan
-120,North Korea
-121,Sierra Leone
+102,Luxembourg
+103,Kyrgyzstan
+104,Madagascar
+105,Armenia
+106,Comoros
+107,Equatorial Guinea
+108,Vietnam
+109,Lebanon
+110,Tanzania
+111,Niger
+112,Libya
+113,Kenya
+114,Kazakhstan
+115,Mauritania
+116,Gambia
+117,Sudan
+118,Namibia
+119,North Korea
+120,Sierra Leone
+121,Malaysia
 122,Indonesia
-123,Azerbaijan
+123,Suriname
 124,Togo
-125,Cyprus
-126,Suriname
-127,Faroe Islands
-128,Malawi
-129,Zimbabwe
-130,Estonia
-131,Rwanda
-132,Guinea-Bissau
-133,Nicaragua
+125,Faroe Islands
+126,Malawi
+127,Azerbaijan
+128,Cyprus
+129,Estonia
+130,Rwanda
+131,Nicaragua
+132,Zimbabwe
+133,Guinea-Bissau
 134,Congo Republic
 135,Kuwait
-136,India
-137,Botswana
-138,Liberia
+136,Philippines
+137,Turkmenistan
+138,Central African Republic
 139,Latvia
-140,Central African Republic
-141,Philippines
-142,Turkmenistan
-143,Dominican Republic
-144,Lesotho
+140,Liberia
+141,India
+142,Dominican Republic
+143,Lesotho
+144,Botswana
 145,Burundi
 146,Lithuania
 147,Ethiopia
-148,Hong Kong
-149,Solomon Islands
+148,Singapore
+149,Yemen
 150,New Caledonia
-151,Saint Kitts and Nevis
-152,Yemen
-153,Guyana
-154,Fiji
-155,Singapore
-156,Moldova
-157,Puerto Rico
-158,Tahiti
+151,Guyana
+152,Solomon Islands
+153,Hong Kong
+154,Saint Kitts and Nevis
+155,Fiji
+156,Puerto Rico
+157,Tahiti
+158,Moldova
 159,Eswatini
-160,Antigua and Barbuda
-161,Vanuatu
+160,Vanuatu
+161,Malta
 162,Afghanistan
 163,Myanmar
-164,Saint Lucia
-165,Grenada
-166,Malta
-167,South Sudan
-168,Bermuda
-169,Cuba
+164,Grenada
+165,Antigua and Barbuda
+166,Cuba
+167,Saint Lucia
+168,South Sudan
+169,Bermuda
 170,Papua New Guinea
 171,Saint Vincent & The Grenadines
 172,Andorra
 173,Maldives
 174,Chinese Taipei
-175,Barbados
-176,Montserrat
-177,Mauritius
-178,Chad
+175,Montserrat
+176,Mauritius
+177,Chad
+178,Barbados
 179,Cambodia
-180,Nepal
+180,Bangladesh
 181,Belize
-182,Dominica
-183,Bangladesh
+182,Nepal
+183,Dominica
 184,American Samoa
-185,Brunei Darussalam
-186,Mongolia
-187,Cook Islands
-188,Laos
-189,Bhutan
-190,Samoa
-191,Sao Tome and Principe
-192,Macau
-193,Sri Lanka
-194,Aruba
+185,Mongolia
+186,Cook Islands
+187,Samoa
+188,Brunei Darussalam
+189,Sao Tome and Principe
+190,Laos
+191,Aruba
+192,Bhutan
+193,Macau
+194,Sri Lanka
 195,Cayman Islands
 196,Djibouti
-197,East Timor
-198,Pakistan
-199,Tonga
-200,Gibraltar
+197,Tonga
+198,East Timor
+199,Pakistan
+200,Somalia
 201,Guam
-202,Somalia
-203,Bahamas
-204,Seychelles
-205,Turks & Caicos Islands
-206,Liechtenstein
+202,Gibraltar
+203,Seychelles
+204,Turks & Caicos Islands
+205,Liechtenstein
+206,Bahamas
 207,US Virgin Islands
 208,British Virgin Islands
 209,Anguilla
