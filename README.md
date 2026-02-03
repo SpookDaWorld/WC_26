@@ -32,7 +32,7 @@ A Flask web application for tracking and scoring the FIFA World Cup 2026 tournam
 ### Point Values
 - Each team starts with a point value based on their FIFA ranking
 - Top-ranked teams have higher point values (e.g., Spain starts with 48 points)
-- Lower-ranked teams have lower point values (minimum 2 points)
+- Lower-ranked teams have lower point values (minimum 1 points)
 
 ### Scoring Matches
 - **Wins**: The winner earns points equal to the loser's current point value
@@ -52,7 +52,7 @@ wc2026/
 ├── app.py              # Main Flask application with routes and logic
 ├── requirements.txt    # Python dependencies
 ├── data/
-│   ├── fifa_2025.csv   # FIFA world rankings
+│   ├── fifa_2026.csv   # FIFA world rankings
 │   └── qualified.csv   # Qualified teams with confederations
 ├── templates/
 │   ├── base.html           # Base template with navigation
@@ -80,7 +80,7 @@ wc2026/
 
 ## Updating Qualified Teams
 
-When the final 6 teams qualify in March 2026, update `data/qualified.csv` with the new teams. Make sure country names match exactly with `data/fifa_2025.csv`.
+When the final 6 teams qualify in March 2026, update `data/qualified.csv` with the new teams. Make sure country names match exactly with `data/fifa_2026.csv`.
 
 ## Admin Actions
 
