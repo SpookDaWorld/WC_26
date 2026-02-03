@@ -31,7 +31,7 @@ A Flask web application for tracking and scoring the FIFA World Cup 2026 tournam
 
 ### Point Values
 - Each team starts with a point value based on their FIFA ranking
-- Top-ranked teams have higher point values (e.g., Spain starts with 48 points)
+- Top-ranked teams have higher point values (e.g., Spain starts with 64 points)
 - Lower-ranked teams have lower point values (minimum 1 points)
 
 ### Scoring Matches
