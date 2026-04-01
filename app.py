@@ -122,11 +122,11 @@ class Team(db.Model):
             'Haiti': 'ht',
             'New Zealand': 'nz',
             'Czechia': 'cz',
-            'Bosnia & Herzigovina': 'ba',
+            'Bosnia and Herzigovina': 'ba',
             'Türkiye': 'tr',
             'Sweden': 'se',
             'Iraq': 'iq',
-            'DR Congo': 'CD',
+            'DR Congo': 'cd',
         }
         return country_codes.get(self.country, 'un')
     
