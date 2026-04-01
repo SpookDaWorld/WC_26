@@ -121,6 +121,12 @@ class Team(db.Model):
             'Curacao': 'cw',
             'Haiti': 'ht',
             'New Zealand': 'nz',
+            'Czechia': 'cz',
+            'Bosnia & Herzigovina': 'ba',
+            'Türkiye': 'tr',
+            'Sweden': 'se',
+            'Iraq': 'iq',
+            'DR Congo': 'CD',
         }
         return country_codes.get(self.country, 'un')
     
@@ -271,7 +277,7 @@ def initialize_teams():
     # Read CSV files
     data_dir = os.path.join(os.path.dirname(__file__), 'data')
     fifa_df = pd.read_csv(os.path.join(data_dir, 'fifa_2026.csv'))
-    qualified_df = pd.read_csv(os.path.join(data_dir, 'qualified_test.csv')) #update to just qualified.csv once it has been updated with all actual qualified teams
+    qualified_df = pd.read_csv(os.path.join(data_dir, 'qualified.csv')) #update to just qualified.csv once it has been updated with all actual qualified teams
     
     # Merge and sort
     merged_df = qualified_df.merge(fifa_df, on='Country', how='left')
