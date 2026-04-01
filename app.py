@@ -122,7 +122,7 @@ class Team(db.Model):
             'Haiti': 'ht',
             'New Zealand': 'nz',
             'Czechia': 'cz',
-            'Bosnia and Herzegovina': 'ba',
+            'Bosnia & Herzegovina': 'ba',
             'Türkiye': 'tr',
             'Sweden': 'se',
             'Iraq': 'iq',
