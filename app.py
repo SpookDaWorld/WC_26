@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import os
 import json
+import atexit
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -1333,7 +1334,99 @@ def init_db():
             print("Database recreated with teams!")
 
 
+# ============================================
+# LIVE MATCH SCRAPER SCHEDULER
+# ============================================
+
+# Scheduler instance (module-level so it isn't garbage collected)
+scraper_scheduler = None
+
+
+def run_scraper_job():
+    """
+    Background job that fetches the latest match results from the
+    Football-Data.org API and checks for automatic round advancement.
+
+    This is invoked on a fixed interval by APScheduler. The scraper
+    module is imported lazily to avoid any circular-import issues at
+    application startup.
+    """
+    try:
+        from scraper import WorldCupScraper, API_KEY
+
+        if not API_KEY or API_KEY == 'YOUR_API_KEY_HERE':
+            print("[scraper] Skipping scrape job: FOOTBALL_DATA_API_KEY is not configured")
+            return
+
+        with app.app_context():
+            scraper = WorldCupScraper(API_KEY)
+            processed = scraper.run_once()
+
+            if processed:
+                print(f"[scraper] Processed {processed} new match(es)")
+            else:
+                print("[scraper] No new finished matches found")
+
+    except Exception as e:
+        print(f"[scraper] Error during scheduled scrape: {e}")
+
+
+def start_scraper_scheduler():
+    """
+    Start the background scheduler that periodically runs the live
+    match scraper. Runs every 5 minutes by default (configurable via
+    the SCRAPER_INTERVAL_MINUTES environment variable).
+
+    Set DISABLE_SCRAPER_SCHEDULER=true to turn this off entirely
+    (e.g. for local development without an API key).
+    """
+    global scraper_scheduler
+
+    if scraper_scheduler is not None:
+        return scraper_scheduler
+
+    if os.environ.get('DISABLE_SCRAPER_SCHEDULER', '').lower() in ('1', 'true', 'yes'):
+        print("[scraper] Scheduler disabled via DISABLE_SCRAPER_SCHEDULER")
+        return None
+
+    api_key = os.environ.get('FOOTBALL_DATA_API_KEY', 'YOUR_API_KEY_HERE')
+    if not api_key or api_key == 'YOUR_API_KEY_HERE':
+        print("[scraper] FOOTBALL_DATA_API_KEY not set - scheduler not started")
+        return None
+
+    interval_minutes = int(os.environ.get('SCRAPER_INTERVAL_MINUTES', '5'))
+
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    scraper_scheduler = BackgroundScheduler(daemon=True, timezone='UTC')
+    scraper_scheduler.add_job(
+        func=run_scraper_job,
+        trigger='interval',
+        minutes=interval_minutes,
+        id='live_match_scraper',
+        replace_existing=True,
+        next_run_time=datetime.utcnow()  # Run once immediately on startup
+    )
+    scraper_scheduler.start()
+    print(f"[scraper] Background scheduler started (every {interval_minutes} minute(s))")
+
+    # Make sure the scheduler shuts down cleanly with the app process
+    atexit.register(lambda: scraper_scheduler.shutdown(wait=False))
+
+    return scraper_scheduler
+
+
+# Ensure the database exists and is migrated before the scheduler starts.
+# Under gunicorn, this module is imported (not run as __main__), so this
+# call is what guarantees tables/columns are ready for the scraper job.
+init_db()
+
+# Start the scheduler when the module is loaded. This covers both:
+#  - `python app.py` (local/dev)
+#  - `gunicorn app:app` (production), since gunicorn imports this module
+start_scraper_scheduler()
+
+
 if __name__ == '__main__':
-    init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
