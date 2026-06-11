@@ -73,6 +73,12 @@ TEAM_NAME_MAP = {
     'Turkey': 'Türkiye',
     'Cape Verde': 'Cabo Verde',
     'Cabo Verde Islands': 'Cabo Verde',
+    'Bosnia-Herzegovina': 'Bosnia & Herzegovina',
+    'Bosnia and Herzegovina': 'Bosnia & Herzegovina',
+    'Czech Republic': 'Czechia',
+    'Curaçao': 'Curacao',
+    'Congo DR': 'DR Congo',
+    'Democratic Republic of the Congo': 'DR Congo',
 }
 
 def normalize_team_name(api_name: str) -> str:

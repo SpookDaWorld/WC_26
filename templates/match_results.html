@@ -292,9 +292,11 @@
             <div class="match-teams">
                 <div class="team home {% if match.status == 'FINISHED' and match.home_score > match.away_score %}winner{% endif %}">
                     <span class="team-name">
+                        {% if match.home_flag %}
                         <img src="https://flagcdn.com/24x18/{{ match.home_flag }}.png" 
                              srcset="https://flagcdn.com/48x36/{{ match.home_flag }}.png 2x"
                              class="flag" alt="{{ match.home_team }}">
+                        {% endif %}
                         <a href="{{ url_for('team_detail', country=match.home_team) }}">{{ match.home_team }}</a>
                     </span>
                 </div>
@@ -311,9 +313,11 @@
                 
                 <div class="team away {% if match.status == 'FINISHED' and match.away_score > match.home_score %}winner{% endif %}">
                     <span class="team-name">
+                        {% if match.away_flag %}
                         <img src="https://flagcdn.com/24x18/{{ match.away_flag }}.png" 
                              srcset="https://flagcdn.com/48x36/{{ match.away_flag }}.png 2x"
                              class="flag" alt="{{ match.away_team }}">
+                        {% endif %}
                         <a href="{{ url_for('team_detail', country=match.away_team) }}">{{ match.away_team }}</a>
                     </span>
                 </div>

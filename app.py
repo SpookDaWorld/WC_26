@@ -887,7 +887,7 @@ def get_upcoming_matches_data(days_ahead=21, limit=30):
     page loads. Returns an empty list if no API key is configured or
     the request fails.
     """
-    now = datetime.utcnow()
+    now = datetime.utcnow().replace(tzinfo=ZoneInfo('UTC'))
     cached_at = _upcoming_matches_cache['fetched_at']
 
     if cached_at and (now - cached_at).total_seconds() < UPCOMING_MATCHES_CACHE_SECONDS:
@@ -925,9 +925,10 @@ def get_upcoming_matches_data(days_ahead=21, limit=30):
 
             utc_date_str = m.get('utcDate', '')
             try:
-                dt = datetime.strptime(utc_date_str, '%Y-%m-%dT%H:%M:%SZ')
+                dt_utc = datetime.strptime(utc_date_str, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=ZoneInfo('UTC'))
+                dt_central = dt_utc.astimezone(CENTRAL_TZ)
             except (ValueError, TypeError):
-                dt = None
+                dt_central = None
 
             stage = (m.get('stage') or '').replace('_', ' ').title()
 
@@ -941,9 +942,9 @@ def get_upcoming_matches_data(days_ahead=21, limit=30):
                 'away_score': 0,
                 'status': status,
                 'stage': stage,
-                'date': dt.strftime('%Y-%m-%d') if dt else '',
-                'date_formatted': dt.strftime('%A, %B %d, %Y') if dt else '',
-                'time': (dt.strftime('%H:%M UTC') if dt else 'TBD'),
+                'date': dt_central.strftime('%Y-%m-%d') if dt_central else '',
+                'date_formatted': dt_central.strftime('%A, %B %d, %Y') if dt_central else '',
+                'time': (dt_central.strftime('%I:%M %p CT').lstrip('0') if dt_central else 'TBD'),
                 'penalties': None
             })
 
