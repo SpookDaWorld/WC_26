@@ -246,15 +246,16 @@ class MatchProcessor:
         score = match.get('score', {})
         
         # Get the final score (handle extra time and penalties)
-        # Priority: penalties > extraTime > fullTime > halfTime
+        # Priority: penalties > extraTime > fullTime > regularTime
         final_score = None
-        for score_type in ['penalties', 'extraTime', 'fullTime']:
+        for score_type in ['penalties', 'extraTime', 'fullTime', 'regularTime']:
             if score.get(score_type) and score[score_type].get('home') is not None:
                 final_score = score[score_type]
                 break
         
         if not final_score:
-            logger.warning(f"No score found for match {match['id']}")
+            logger.warning(f"No score found for match {match['id']} ({home_team} vs {away_team}, status={match.get('status')})")
+            logger.warning(f"Raw score data: {score}")
             return None, None, False
         
         home_goals = final_score['home']
@@ -322,11 +323,16 @@ class MatchProcessor:
             logger.warning(f"Could not determine result for match {match_id}")
             return False
         
-        # Extract scores
+        # Extract scores for display (fall back to regularTime if fullTime is missing)
         score = match.get('score', {})
-        full_time = score.get('fullTime', {})
+        full_time = score.get('fullTime', {}) or {}
         home_score = full_time.get('home')
         away_score = full_time.get('away')
+        
+        if home_score is None or away_score is None:
+            regular_time = score.get('regularTime', {}) or {}
+            home_score = regular_time.get('home')
+            away_score = regular_time.get('away')
         
         # Get team names for determining which score belongs to which team
         home_team = normalize_team_name(match['homeTeam']['name'])

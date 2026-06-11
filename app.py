@@ -807,7 +807,16 @@ def get_live_matches_data():
         from scraper import FootballDataClient, normalize_team_name
 
         client = FootballDataClient(api_key)
-        live = client.get_matches(status='LIVE')
+
+        # Fetch today's matches rather than relying solely on the
+        # status=LIVE filter (behavior of which is undocumented/unreliable
+        # in v4). We filter client-side for IN_PLAY/PAUSED statuses.
+        todays_matches = client.get_todays_matches()
+
+        print(f"[live matches] Today's matches from API: "
+              f"{[(m.get('id'), m['homeTeam'].get('name'), m['awayTeam'].get('name'), m.get('status')) for m in (todays_matches or [])]}")
+
+        live = [m for m in (todays_matches or []) if m.get('status') in ('IN_PLAY', 'PAUSED', 'LIVE')]
 
         if not live:
             _live_matches_cache['data'] = []
@@ -856,6 +865,79 @@ def get_live_matches_data():
     except Exception as e:
         print(f"[live matches] Error fetching live matches: {e}")
         return _live_matches_cache['data']
+
+
+@app.route('/api/debug-live')
+@admin_required
+def debug_live_matches():
+    """
+    Admin-only diagnostic endpoint. Exercises the same code path as the
+    live-matches feature on the Results page, but returns full details
+    on every match scheduled for "today" (per the API's UTC clock) along
+    with their current status - regardless of whether anything is
+    actually live right now. Useful for verifying connectivity, team
+    name normalization, and parsing ahead of a live match.
+    """
+    api_key = os.environ.get('FOOTBALL_DATA_API_KEY', '')
+
+    if not api_key or api_key == 'YOUR_API_KEY_HERE':
+        return jsonify({'success': False, 'error': 'FOOTBALL_DATA_API_KEY not configured'}), 500
+
+    try:
+        from scraper import FootballDataClient, normalize_team_name
+
+        client = FootballDataClient(api_key)
+        todays_matches = client.get_todays_matches()
+
+        if todays_matches is None:
+            return jsonify({
+                'success': False,
+                'error': 'API request failed (see server logs for details)'
+            }), 502
+
+        details = []
+        for m in todays_matches:
+            home_api = m['homeTeam'].get('name')
+            away_api = m['awayTeam'].get('name')
+            home_norm = normalize_team_name(home_api)
+            away_norm = normalize_team_name(away_api)
+
+            home_team = Team.query.filter_by(country=home_norm).first()
+            away_team = Team.query.filter_by(country=away_norm).first()
+
+            details.append({
+                'id': m.get('id'),
+                'utcDate': m.get('utcDate'),
+                'status': m.get('status'),
+                'minute': m.get('minute'),
+                'stage': m.get('stage'),
+                'home_team_api_name': home_api,
+                'home_team_normalized': home_norm,
+                'home_team_found_in_db': home_team is not None,
+                'away_team_api_name': away_api,
+                'away_team_normalized': away_norm,
+                'away_team_found_in_db': away_team is not None,
+                'score': m.get('score'),
+            })
+
+        # Also run the actual function used by /results so we can compare
+        with app.app_context():
+            live_matches_result = get_live_matches_data()
+
+        return jsonify({
+            'success': True,
+            'now_utc': datetime.utcnow().isoformat() + 'Z',
+            'total_matches_today': len(todays_matches),
+            'matches_today': details,
+            'live_matches_result': live_matches_result,
+            'cache_state': {
+                'fetched_at': _live_matches_cache['fetched_at'].isoformat() + 'Z' if _live_matches_cache['fetched_at'] else None,
+                'data': _live_matches_cache['data']
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/results')
