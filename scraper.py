@@ -103,8 +103,9 @@ class FootballDataClient:
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 429:
-                logger.warning("Rate limited. Waiting 60 seconds...")
-                time.sleep(60)
+                # Don't block here - the caller may be a web request handler.
+                # Just log and back off; the next scheduled/cached call will retry.
+                logger.warning("Rate limited (429) by Football-Data.org API")
                 return None
             else:
                 logger.error(f"API error {response.status_code}: {response.text}")

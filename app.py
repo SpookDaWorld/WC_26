@@ -771,7 +771,7 @@ def leaderboard():
 # Simple in-memory cache for live match data so we don't hit the
 # Football-Data.org API on every page request
 _live_matches_cache = {'data': [], 'fetched_at': None}
-LIVE_MATCHES_CACHE_SECONDS = 30
+LIVE_MATCHES_CACHE_SECONDS = 60
 
 
 def get_live_matches_data():
@@ -1042,10 +1042,21 @@ def statistics():
                           current_round=get_current_round())
 
 
+# Simple in-memory cache for top scorers (these change infrequently)
+_top_scorers_cache = {'data': None, 'fetched_at': None}
+TOP_SCORERS_CACHE_SECONDS = 120
+
+
 @app.route('/api/top-scorers')
 def api_top_scorers():
-    """API endpoint to fetch top scorers from Football-Data.org"""
+    """API endpoint to fetch top scorers from Football-Data.org (cached)"""
     import requests
+    
+    # Serve from cache if recent enough
+    now = datetime.utcnow()
+    cached_at = _top_scorers_cache['fetched_at']
+    if cached_at and (now - cached_at).total_seconds() < TOP_SCORERS_CACHE_SECONDS and _top_scorers_cache['data'] is not None:
+        return jsonify(_top_scorers_cache['data'])
     
     api_key = os.environ.get('FOOTBALL_DATA_API_KEY', '')
     
@@ -1080,7 +1091,15 @@ def api_top_scorers():
                     'matches_played': scorer.get('playedMatches', 0)
                 })
             
-            return jsonify({'success': True, 'scorers': formatted_scorers})
+            result = {'success': True, 'scorers': formatted_scorers}
+            _top_scorers_cache['data'] = result
+            _top_scorers_cache['fetched_at'] = now
+            return jsonify(result)
+        elif response.status_code == 429:
+            # Rate limited - serve stale cache if we have it, otherwise a friendly error
+            if _top_scorers_cache['data'] is not None:
+                return jsonify(_top_scorers_cache['data'])
+            return jsonify({'success': False, 'error': 'Rate limited by Football-Data.org, try again shortly'}), 429
         else:
             return jsonify({'success': False, 'error': f'API error: {response.status_code}'}), response.status_code
             
@@ -1520,4 +1539,4 @@ start_scraper_scheduler()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=False, host='0.0.0.0', port=port, threaded=True)
