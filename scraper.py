@@ -219,17 +219,29 @@ class MatchProcessor:
     def __init__(self):
         self.processed_matches = self._load_processed_matches()
     
+    def _processed_matches_path(self) -> str:
+        """
+        Return the path for the processed-matches tracking file.
+
+        This must live on the persistent disk (same as tournament.db) -
+        otherwise it gets wiped on every redeploy, causing already-recorded
+        matches to be re-processed (and re-scored) again.
+        """
+        if os.path.exists('/var/data'):
+            return '/var/data/processed_matches.json'
+        return 'processed_matches.json'
+    
     def _load_processed_matches(self) -> set:
         """Load set of already processed match IDs"""
         try:
-            with open('processed_matches.json', 'r') as f:
+            with open(self._processed_matches_path(), 'r') as f:
                 return set(json.load(f))
         except FileNotFoundError:
             return set()
     
     def _save_processed_matches(self):
         """Save processed match IDs to file"""
-        with open('processed_matches.json', 'w') as f:
+        with open(self._processed_matches_path(), 'w') as f:
             json.dump(list(self.processed_matches), f)
     
     def _get_match_result(self, match: dict) -> Tuple[Optional[str], Optional[str], bool]:
@@ -357,6 +369,28 @@ class MatchProcessor:
         
         # Record the match with scores
         with app.app_context():
+            # Safety net: even if processed_matches.json was reset (e.g. by a
+            # redeploy), don't double-record a result we already have for
+            # this pair of teams in this round.
+            home_team_obj = Team.query.filter_by(country=home_team).first()
+            away_team_obj = Team.query.filter_by(country=away_team).first()
+            
+            if home_team_obj and away_team_obj:
+                existing = Match.query.filter(
+                    Match.round_name == match_round,
+                    db.or_(
+                        db.and_(Match.team1_id == home_team_obj.id, Match.team2_id == away_team_obj.id),
+                        db.and_(Match.team1_id == away_team_obj.id, Match.team2_id == home_team_obj.id),
+                    )
+                ).first()
+                
+                if existing:
+                    logger.info(f"Match {match_id} ({home_team} vs {away_team}, {match_round}) "
+                                f"already recorded in database - marking as processed and skipping")
+                    self.processed_matches.add(match_id)
+                    self._save_processed_matches()
+                    return False
+            
             if is_draw:
                 # For draws, winner/loser are team1/team2
                 # team1 is home, team2 is away
@@ -375,9 +409,7 @@ class MatchProcessor:
                 self.processed_matches.add(match_id)
                 self._save_processed_matches()
                 
-                home_team = normalize_team_name(match['homeTeam']['name'])
-                away_team = normalize_team_name(match['awayTeam']['name'])
-                score_str = f"{match['score']['fullTime']['home']}-{match['score']['fullTime']['away']}"
+                score_str = f"{home_score}-{away_score}"
                 
                 logger.info(f"✓ Recorded {result_type}: {home_team} {score_str} {away_team}")
                 logger.info(f"  {message.split(chr(10))[0]}")  # First line of message
