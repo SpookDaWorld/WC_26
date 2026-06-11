@@ -5,7 +5,8 @@ Adapted from the original Tkinter application
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import os
@@ -45,6 +46,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Admin password - set via environment variable in production
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'wc2026admin')
+
+# Used for "today" / date-based match grouping so it lines up with US
+# Central Time rather than UTC (handles CST/CDT automatically)
+CENTRAL_TZ = ZoneInfo('America/Chicago')
 
 db = SQLAlchemy(app)
 
@@ -867,6 +872,233 @@ def get_live_matches_data():
         return _live_matches_cache['data']
 
 
+# Simple in-memory cache for upcoming matches (schedule rarely changes)
+_upcoming_matches_cache = {'data': [], 'fetched_at': None}
+UPCOMING_MATCHES_CACHE_SECONDS = 300  # 5 minutes
+
+
+def get_upcoming_matches_data(days_ahead=21, limit=30):
+    """
+    Fetch upcoming (SCHEDULED/TIMED) World Cup matches from the
+    Football-Data.org API for the next `days_ahead` days, formatted for
+    display on the Results page.
+
+    Results are cached briefly to avoid hammering the API on repeated
+    page loads. Returns an empty list if no API key is configured or
+    the request fails.
+    """
+    now = datetime.utcnow()
+    cached_at = _upcoming_matches_cache['fetched_at']
+
+    if cached_at and (now - cached_at).total_seconds() < UPCOMING_MATCHES_CACHE_SECONDS:
+        return _upcoming_matches_cache['data']
+
+    api_key = os.environ.get('FOOTBALL_DATA_API_KEY', '')
+    if not api_key or api_key == 'YOUR_API_KEY_HERE':
+        return []
+
+    try:
+        from scraper import FootballDataClient, normalize_team_name
+
+        client = FootballDataClient(api_key)
+        date_from = now.strftime('%Y-%m-%d')
+        date_to = (now + timedelta(days=days_ahead)).strftime('%Y-%m-%d')
+
+        matches = client.get_matches(date_from=date_from, date_to=date_to)
+
+        if not matches:
+            _upcoming_matches_cache['data'] = []
+            _upcoming_matches_cache['fetched_at'] = now
+            return []
+
+        upcoming = []
+        for m in matches:
+            status = m.get('status')
+            if status not in ('SCHEDULED', 'TIMED'):
+                continue
+
+            home_name = normalize_team_name(m['homeTeam']['name'])
+            away_name = normalize_team_name(m['awayTeam']['name'])
+
+            home_team = Team.query.filter_by(country=home_name).first()
+            away_team = Team.query.filter_by(country=away_name).first()
+
+            utc_date_str = m.get('utcDate', '')
+            try:
+                dt = datetime.strptime(utc_date_str, '%Y-%m-%dT%H:%M:%SZ')
+            except (ValueError, TypeError):
+                dt = None
+
+            stage = (m.get('stage') or '').replace('_', ' ').title()
+
+            upcoming.append({
+                'id': m.get('id'),
+                'home_team': home_name,
+                'away_team': away_name,
+                'home_flag': home_team.flag_code if home_team else '',
+                'away_flag': away_team.flag_code if away_team else '',
+                'home_score': 0,
+                'away_score': 0,
+                'status': status,
+                'stage': stage,
+                'date': dt.strftime('%Y-%m-%d') if dt else '',
+                'date_formatted': dt.strftime('%A, %B %d, %Y') if dt else '',
+                'time': (dt.strftime('%H:%M UTC') if dt else 'TBD'),
+                'penalties': None
+            })
+
+        # Sort chronologically and limit
+        upcoming.sort(key=lambda x: (x['date'], x['time']))
+        upcoming = upcoming[:limit]
+
+        _upcoming_matches_cache['data'] = upcoming
+        _upcoming_matches_cache['fetched_at'] = now
+        return upcoming
+
+    except Exception as e:
+        print(f"[upcoming matches] Error fetching upcoming matches: {e}")
+        return _upcoming_matches_cache['data']
+
+
+# Simple in-memory cache for "today" matches
+_today_matches_cache = {'data': [], 'fetched_at': None}
+TODAY_MATCHES_CACHE_SECONDS = 60
+
+
+def get_todays_matches_data():
+    """
+    Fetch ALL of "today's" World Cup matches (finished, live, and
+    scheduled) directly from the Football-Data.org API, formatted for
+    display on the Results page.
+
+    "Today" is determined using US Central Time (America/Chicago, which
+    automatically handles CST/CDT) rather than UTC, so a match scheduled
+    for tonight (Central) shows up under "Today" even if its UTC date
+    has already rolled over to tomorrow.
+
+    This is independent of the local database - it includes matches that
+    haven't been recorded locally yet (e.g. tonight's scheduled match).
+
+    Results are cached briefly to avoid hammering the API on repeated
+    page loads. Returns an empty list if no API key is configured or
+    the request fails.
+    """
+    now_utc = datetime.utcnow().replace(tzinfo=ZoneInfo('UTC'))
+    cached_at = _today_matches_cache['fetched_at']
+
+    if cached_at and (now_utc - cached_at).total_seconds() < TODAY_MATCHES_CACHE_SECONDS:
+        return _today_matches_cache['data']
+
+    api_key = os.environ.get('FOOTBALL_DATA_API_KEY', '')
+    if not api_key or api_key == 'YOUR_API_KEY_HERE':
+        return []
+
+    try:
+        from scraper import FootballDataClient, normalize_team_name
+
+        client = FootballDataClient(api_key)
+
+        # "Today" in Central Time
+        today_central = now_utc.astimezone(CENTRAL_TZ).date()
+
+        # Central Time is UTC-5/UTC-6, so a Central calendar day can span
+        # two UTC calendar days. Fetch a window covering yesterday through
+        # tomorrow (UTC) to be safe, then filter by Central date below.
+        date_from = (now_utc - timedelta(days=1)).strftime('%Y-%m-%d')
+        date_to = (now_utc + timedelta(days=1)).strftime('%Y-%m-%d')
+
+        matches = client.get_matches(date_from=date_from, date_to=date_to)
+
+        if matches is None:
+            _today_matches_cache['data'] = []
+            _today_matches_cache['fetched_at'] = now_utc
+            return []
+
+        formatted = []
+        for m in matches:
+            utc_date_str = m.get('utcDate', '')
+            try:
+                dt_utc = datetime.strptime(utc_date_str, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=ZoneInfo('UTC'))
+            except (ValueError, TypeError):
+                continue
+
+            dt_central = dt_utc.astimezone(CENTRAL_TZ)
+
+            # Only keep matches that fall on "today" in Central Time
+            if dt_central.date() != today_central:
+                continue
+
+            status = m.get('status')
+
+            home_name = normalize_team_name(m['homeTeam']['name'])
+            away_name = normalize_team_name(m['awayTeam']['name'])
+
+            home_team = Team.query.filter_by(country=home_name).first()
+            away_team = Team.query.filter_by(country=away_name).first()
+
+            score = m.get('score', {}) or {}
+
+            stage = (m.get('stage') or '').replace('_', ' ').title()
+
+            penalties = None
+            home_score, away_score = 0, 0
+            display_status = status
+
+            if status == 'FINISHED':
+                # Headline score: prefer extraTime > fullTime > regularTime
+                headline = None
+                for score_type in ['extraTime', 'fullTime', 'regularTime']:
+                    st = score.get(score_type) or {}
+                    if st.get('home') is not None:
+                        headline = st
+                        break
+                if headline:
+                    home_score = headline.get('home', 0)
+                    away_score = headline.get('away', 0)
+
+                pens = score.get('penalties') or {}
+                if pens.get('home') is not None:
+                    penalties = f"({pens['home']}-{pens['away']} PEN)"
+
+                display_status = 'FINISHED'
+
+            elif status in ('IN_PLAY', 'PAUSED'):
+                full_time = score.get('fullTime') or {}
+                home_score = full_time.get('home') if full_time.get('home') is not None else 0
+                away_score = full_time.get('away') if full_time.get('away') is not None else 0
+                display_status = 'LIVE'
+
+            else:
+                # SCHEDULED, TIMED, POSTPONED, etc.
+                display_status = status
+
+            formatted.append({
+                'id': m.get('id'),
+                'home_team': home_name,
+                'away_team': away_name,
+                'home_flag': home_team.flag_code if home_team else '',
+                'away_flag': away_team.flag_code if away_team else '',
+                'home_score': home_score,
+                'away_score': away_score,
+                'status': display_status,
+                'stage': stage,
+                'date': dt_central.strftime('%Y-%m-%d'),
+                'date_formatted': dt_central.strftime('%A, %B %d, %Y'),
+                'time': dt_central.strftime('%I:%M %p CT').lstrip('0'),
+                'penalties': penalties
+            })
+
+        formatted.sort(key=lambda x: (x['date'], x['time']))
+
+        _today_matches_cache['data'] = formatted
+        _today_matches_cache['fetched_at'] = now_utc
+        return formatted
+
+    except Exception as e:
+        print(f"[today matches] Error fetching today's matches: {e}")
+        return _today_matches_cache['data']
+
+
 @app.route('/api/debug-live')
 @admin_required
 def debug_live_matches():
@@ -1009,10 +1241,9 @@ def match_results():
     elif filter_type == 'finished':
         pass  # All DB matches are finished
     elif filter_type == 'upcoming':
-        matches = []  # Upcoming matches would come from API
+        matches = get_upcoming_matches_data()
     elif filter_type == 'today':
-        today = datetime.utcnow().strftime('%Y-%m-%d')
-        matches = [m for m in matches if m['date'] == today]
+        matches = get_todays_matches_data()
     
     # Count qualified teams
     qualified_count = Team.query.count()
