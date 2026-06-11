@@ -1,25 +1,25 @@
 Rank,Country
-1,France
+1,Argentina
 2,Spain
-3,Argentina
+3,France
 4,England
 5,Portugal
 6,Brazil
-7,Netherlands
-8,Morocco
+7,Morocco
+8,Netherlands
 9,Belgium
 10,Germany
 11,Croatia
 12,Italy
 13,Colombia
-14,Senegal
-15,Mexico
-16,United States
-17,Uruguay
+14,Mexico
+15,Senegal
+16,Uruguay
+17,United States
 18,Japan
 19,Switzerland
-20,Denmark
-21,Iran
+20,Iran
+21,Denmark
 22,Türkiye
 23,Ecuador
 24,Austria
@@ -31,130 +31,130 @@ Rank,Country
 30,Canada
 31,Norway
 32,Ukraine
-33,Panama
-34,Côte d'Ivoire
-35,Poland
-36,Russia
+33,Côte d'Ivoire
+34,Panama
+35,Russia
+36,Poland
 37,Wales
 38,Sweden
-39,Serbia
-40,Paraguay
-41,Czechia
-42,Hungary
-43,Scotland
-44,Tunisia
-45,Cameroon
+39,Hungary
+40,Czechia
+41,Paraguay
+42,Scotland
+43,Serbia
+44,Cameroon
+45,Tunisia
 46,DR Congo
-47,Greece
-48,Slovakia
+47,Slovakia
+48,Greece
 49,Venezuela
 50,Uzbekistan
-51,Costa Rica
-52,Mali
-53,Peru
-54,Chile
-55,Qatar
-56,Romania
+51,Chile
+52,Peru
+53,Costa Rica
+54,Romania
+55,Mali
+56,Qatar
 57,Iraq
-58,Slovenia
-59,Ireland
+58,Ireland
+59,Slovenia
 60,South Africa
 61,Saudi Arabia
 62,Burkina Faso
 63,Jordan
-64,Albania
-65,Bosnia & Herzegovina
-66,Honduras
-67,North Macedonia
+64,Bosnia & Herzegovina
+65,Honduras
+66,Albania
+67,Cabo Verde
 68,United Arab Emirates
-69,Cabo Verde
+69,North Macedonia
 70,Northern Ireland
 71,Jamaica
 72,Georgia
-73,Finland
-74,Ghana
-75,Iceland
-76,Bolivia
-77,Israel
+73,Ghana
+74,Iceland
+75,Finland
+76,Israel
+77,Bolivia
 78,Kosovo
 79,Oman
-80,Guinea
-81,Montenegro
+80,Montenegro
+81,Guinea
 82,Curacao
 83,Haiti
 84,Syria
 85,New Zealand
-86,Bulgaria
-87,Gabon
-88,Uganda
-89,Angola
-90,Benin
-91,Bahrain
-92,Zambia
-93,Thailand
-94,China
+86,Gabon
+87,Bulgaria
+88,Angola
+89,Uganda
+90,Zambia
+91,China
+92,Bahrain
+93,Benin
+94,Thailand
 95,Palestine
-96,Guatemala
-97,Belarus
+96,Belarus
+97,Guatemala
 98,Luxembourg
 99,Vietnam
 100,El Salvador
-101,Mozambique
+101,Tajikistan
 102,Trinidad and Tobago
-103,Tajikistan
+103,Mozambique
 104,Madagascar
 105,Equatorial Guinea
-106,Armenia
-107,Kyrgyzstan
-108,Lebanon
-109,Comoros
-110,Kazakhstan
-111,Kenya
-112,Libya
-113,Tanzania
+106,Kyrgyzstan
+107,Armenia
+108,Comoros
+109,Kenya
+110,Libya
+111,Kazakhstan
+112,Tanzania
+113,Mauritania
 114,Niger
-115,Mauritania
+115,Lebanon
 116,Gambia
 117,Sudan
-118,North Korea
-119,Sierra Leone
-120,Namibia
-121,Togo
-122,Indonesia
+118,Indonesia
+119,Togo
+120,North Korea
+121,Namibia
+122,Sierra Leone
 123,Faroe Islands
-124,Azerbaijan
+124,Cyprus
 125,Suriname
-126,Cyprus
-127,Malawi
+126,Azerbaijan
+127,Estonia
 128,Rwanda
-129,Estonia
+129,Malawi
 130,Zimbabwe
 131,Nicaragua
 132,Guinea-Bissau
-133,Congo Republic
-134,Kuwait
+133,Kuwait
+134,Congo Republic
 135,Philippines
-136,India
+136,Malaysia
 137,Latvia
-138,Malaysia
+138,India
 139,Central African Republic
 140,Liberia
 141,Turkmenistan
 142,Burundi
-143,Dominican Republic
-144,Ethiopia
-145,Lesotho
-146,Botswana
-147,Singapore
-148,Lithuania
-149,Yemen
+143,Ethiopia
+144,Dominican Republic
+145,Yemen
+146,Lesotho
+147,Botswana
+148,Singapore
+149,Lithuania
 150,Guyana
 151,New Caledonia
 152,Saint Kitts and Nevis
 153,Solomon Islands
-154,Fiji
-155,Hong Kong
-156,Puerto Rico
+154,Puerto Rico
+155,Fiji
+156,Hong Kong
 157,Tahiti
 158,Myanmar
 159,Moldova
@@ -164,18 +164,18 @@ Rank,Country
 163,Grenada
 164,Cuba
 165,Eswatini
-166,Bermuda
-167,Saint Lucia
+166,Saint Lucia
+167,Bermuda
 168,Papua New Guinea
-169,Afghanistan
-170,South Sudan
-171,Saint Vincent & The Grenadines
-172,Maldives
-173,Andorra
+169,South Sudan
+170,Saint Vincent & The Grenadines
+171,Afghanistan
+172,Andorra
+173,Maldives
 174,Chinese Taipei
-175,Montserrat
-176,Nepal
-177,Cambodia
+175,Cambodia
+176,Montserrat
+177,Nepal
 178,Mauritius
 179,Barbados
 180,Belize
@@ -184,29 +184,29 @@ Rank,Country
 183,Chad
 184,Eritrea
 185,Laos
-186,Bhutan
-187,Mongolia
-188,Cook Islands
+186,Cook Islands
+187,Sri Lanka
+188,Samoa
 189,Aruba
-190,Samoa
-191,Sri Lanka
-192,American Samoa
-193,Brunei Darussalam
-194,Macau
-195,Cayman Islands
-196,Sao Tome and Principe
-197,Djibouti
-198,Somalia
-199,Tonga
-200,Timor-Leste
-201,Guam
-202,Pakistan
-203,Gibraltar
+190,Mongolia
+191,American Samoa
+192,Bhutan
+193,Macau
+194,Brunei Darussalam
+195,Sao Tome and Principe
+196,Djibouti
+197,Cayman Islands
+198,Pakistan
+199,Somalia
+200,Tonga
+201,Timor-Leste
+202,Gibraltar
+203,Guam
 204,Seychelles
 205,Turks & Caicos Islands
 206,Liechtenstein
 207,Bahamas
-208,British Virgin Islands
-209,US Virgin Islands
+208,US Virgin Islands
+209,British Virgin Islands
 210,Anguilla
 211,San Marino
