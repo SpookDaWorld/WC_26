@@ -11,6 +11,16 @@ import pandas as pd
 import os
 import json
 import atexit
+import sys
+
+# When this file is run directly (`python app.py`), Python registers it as
+# the '__main__' module, NOT as 'app'. scraper.py does `from app import ...`,
+# which would otherwise cause Python to import (and fully re-execute) this
+# entire file a SECOND time as a separate 'app' module - including init_db()
+# and start_scraper_scheduler() at the bottom, resulting in duplicate
+# schedulers and double the API calls. Aliasing this module as 'app' in
+# sys.modules ensures scraper.py reuses this same running instance instead.
+sys.modules.setdefault('app', sys.modules[__name__])
 
 # Initialize Flask app
 app = Flask(__name__)
