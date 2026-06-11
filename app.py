@@ -768,6 +768,86 @@ def leaderboard():
                           top_n=top_n or 'all')
 
 
+# Simple in-memory cache for live match data so we don't hit the
+# Football-Data.org API on every page request
+_live_matches_cache = {'data': [], 'fetched_at': None}
+LIVE_MATCHES_CACHE_SECONDS = 30
+
+
+def get_live_matches_data():
+    """
+    Fetch currently live (in-play / paused) World Cup matches from the
+    Football-Data.org API and format them for display.
+
+    Results are cached briefly to avoid hammering the API on repeated
+    page loads. Returns an empty list if no API key is configured or
+    the request fails.
+    """
+    now = datetime.utcnow()
+    cached_at = _live_matches_cache['fetched_at']
+
+    if cached_at and (now - cached_at).total_seconds() < LIVE_MATCHES_CACHE_SECONDS:
+        return _live_matches_cache['data']
+
+    api_key = os.environ.get('FOOTBALL_DATA_API_KEY', '')
+    if not api_key or api_key == 'YOUR_API_KEY_HERE':
+        return []
+
+    try:
+        from scraper import FootballDataClient, normalize_team_name
+
+        client = FootballDataClient(api_key)
+        live = client.get_matches(status='LIVE')
+
+        if not live:
+            _live_matches_cache['data'] = []
+            _live_matches_cache['fetched_at'] = now
+            return []
+
+        live_matches = []
+        for m in live:
+            home_name = normalize_team_name(m['homeTeam']['name'])
+            away_name = normalize_team_name(m['awayTeam']['name'])
+
+            home_team = Team.query.filter_by(country=home_name).first()
+            away_team = Team.query.filter_by(country=away_name).first()
+
+            score = m.get('score', {}) or {}
+            full_time = score.get('fullTime', {}) or {}
+
+            status = m.get('status', '')
+            minute = m.get('minute')
+
+            if minute is not None:
+                minute_display = f"{minute}'"
+            elif status == 'PAUSED':
+                minute_display = 'HT'
+            else:
+                minute_display = 'LIVE'
+
+            stage = (m.get('stage') or '').replace('_', ' ').title()
+
+            live_matches.append({
+                'home_team': home_name,
+                'away_team': away_name,
+                'home_flag': home_team.flag_code if home_team else '',
+                'away_flag': away_team.flag_code if away_team else '',
+                'home_score': full_time.get('home') if full_time.get('home') is not None else 0,
+                'away_score': full_time.get('away') if full_time.get('away') is not None else 0,
+                'minute': minute_display,
+                'stage': stage,
+                'status': status
+            })
+
+        _live_matches_cache['data'] = live_matches
+        _live_matches_cache['fetched_at'] = now
+        return live_matches
+
+    except Exception as e:
+        print(f"[live matches] Error fetching live matches: {e}")
+        return _live_matches_cache['data']
+
+
 @app.route('/results')
 def match_results():
     """Match results page - shows live scores and completed matches"""
@@ -778,7 +858,6 @@ def match_results():
     
     # Build match data for display
     matches = []
-    live_matches = []
     
     for m in all_matches:
         team1 = Team.query.get(m.team1_id)
@@ -793,15 +872,24 @@ def match_results():
             if m.team1_id == m.winner_id:
                 home_team, away_team = team1.country, team2.country
                 home_flag, away_flag = team1.flag_code, team2.flag_code
-                home_score, away_score = 1, 0  # We don't store actual goals, just who won
+                if m.team1_score is not None and m.team2_score is not None:
+                    home_score, away_score = m.team1_score, m.team2_score
+                else:
+                    home_score, away_score = 1, 0  # Fallback if no score recorded
             else:
                 home_team, away_team = team2.country, team1.country
                 home_flag, away_flag = team2.flag_code, team1.flag_code
-                home_score, away_score = 0, 1
+                if m.team1_score is not None and m.team2_score is not None:
+                    home_score, away_score = m.team2_score, m.team1_score
+                else:
+                    home_score, away_score = 0, 1  # Fallback if no score recorded
         else:
             home_team, away_team = team1.country, team2.country
             home_flag, away_flag = team1.flag_code, team2.flag_code
-            home_score, away_score = 0, 0  # Draw
+            if m.team1_score is not None and m.team2_score is not None:
+                home_score, away_score = m.team1_score, m.team2_score
+            else:
+                home_score, away_score = 0, 0  # Draw, no score recorded
         
         match_data = {
             'id': m.id,
@@ -820,9 +908,12 @@ def match_results():
         }
         matches.append(match_data)
     
+    # Fetch currently live matches from the API (cached briefly)
+    live_matches = get_live_matches_data()
+    
     # Filter based on request
     if filter_type == 'live':
-        matches = []  # Live matches come from API, not DB
+        matches = []  # Only show the live matches section
     elif filter_type == 'finished':
         pass  # All DB matches are finished
     elif filter_type == 'upcoming':
