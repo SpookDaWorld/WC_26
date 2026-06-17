@@ -261,40 +261,56 @@ class MatchProcessor:
         home_team = normalize_team_name(match['homeTeam']['name'])
         away_team = normalize_team_name(match['awayTeam']['name'])
         
-        score = match.get('score', {})
+        score = match.get('score', {}) or {}
         
         # Get the final score (handle extra time and penalties)
         # Priority: penalties > extraTime > fullTime > regularTime
+        # NOTE: use explicit "is not None" checks (not truthiness) so a
+        # legitimate 0 score is never treated as "missing".
         final_score = None
         for score_type in ['penalties', 'extraTime', 'fullTime', 'regularTime']:
-            if score.get(score_type) and score[score_type].get('home') is not None:
-                final_score = score[score_type]
+            block = score.get(score_type) or {}
+            if block.get('home') is not None and block.get('away') is not None:
+                final_score = block
                 break
         
-        if not final_score:
-            logger.warning(f"No score found for match {match['id']} ({home_team} vs {away_team}, status={match.get('status')})")
-            logger.warning(f"Raw score data: {score}")
-            return None, None, False
-        
-        home_goals = final_score['home']
-        away_goals = final_score['away']
-        
-        if home_goals > away_goals:
-            return home_team, away_team, False  # Home team wins
-        elif away_goals > home_goals:
-            return away_team, home_team, False  # Away team wins
-        else:
-            # Check if there was a penalty shootout winner
-            if score.get('penalties') and score['penalties'].get('home') is not None:
-                pen_home = score['penalties']['home']
-                pen_away = score['penalties']['away']
-                if pen_home > pen_away:
+        # Determine the result type using the score we found.
+        if final_score is not None:
+            home_goals = final_score['home']
+            away_goals = final_score['away']
+            
+            if home_goals > away_goals:
+                return home_team, away_team, False  # Home team wins
+            elif away_goals > home_goals:
+                return away_team, home_team, False  # Away team wins
+            
+            # Tied on this score block - check for a penalty shootout winner
+            pens = score.get('penalties') or {}
+            if pens.get('home') is not None and pens.get('away') is not None:
+                if pens['home'] > pens['away']:
                     return home_team, away_team, False
-                elif pen_away > pen_home:
+                elif pens['away'] > pens['home']:
                     return away_team, home_team, False
             
-            # It's a draw (only valid in group stage)
+            # Genuinely tied with no shootout -> draw (valid in group stage)
             return home_team, away_team, True
+        
+        # No usable numeric score found. Fall back to the API's explicit
+        # "winner" field if present, so we can still classify the result
+        # (e.g. a confirmed DRAW) even when score sub-objects are sparse.
+        winner_field = score.get('winner')
+        if winner_field == 'DRAW':
+            return home_team, away_team, True
+        elif winner_field == 'HOME_TEAM':
+            return home_team, away_team, False
+        elif winner_field == 'AWAY_TEAM':
+            return away_team, home_team, False
+        
+        # Truly nothing to go on yet (likely data lag right after FT) -
+        # return None so the match is retried on the next cycle.
+        logger.warning(f"No score found for match {match['id']} ({home_team} vs {away_team}, status={match.get('status')})")
+        logger.warning(f"Raw score data: {score}")
+        return None, None, False
     
     def _determine_round(self, match: dict) -> str:
         """Determine the tournament round from API match data"""
@@ -341,20 +357,38 @@ class MatchProcessor:
             logger.warning(f"Could not determine result for match {match_id}")
             return False
         
-        # Extract scores for display (fall back to regularTime if fullTime is missing)
-        score = match.get('score', {})
-        full_time = score.get('fullTime', {}) or {}
-        home_score = full_time.get('home')
-        away_score = full_time.get('away')
+        # Extract scores for display. Prefer the score that reflects how
+        # the match was ultimately decided in regulation/extra time:
+        # fullTime (includes ET on this API) > regularTime > extraTime.
+        # Penalty shootout scores are tracked separately, not as the headline.
+        score = match.get('score', {}) or {}
+        home_score = away_score = None
+        for score_type in ['fullTime', 'regularTime', 'extraTime']:
+            block = score.get(score_type) or {}
+            if block.get('home') is not None and block.get('away') is not None:
+                home_score = block['home']
+                away_score = block['away']
+                break
         
+        # Last-resort default so we never store/display None
         if home_score is None or away_score is None:
-            regular_time = score.get('regularTime', {}) or {}
-            home_score = regular_time.get('home')
-            away_score = regular_time.get('away')
+            home_score = 0 if home_score is None else home_score
+            away_score = 0 if away_score is None else away_score
         
         # Get team names for determining which score belongs to which team
         home_team = normalize_team_name(match['homeTeam']['name'])
         away_team = normalize_team_name(match['awayTeam']['name'])
+        
+        # Parse the actual match kickoff time (UTC) from the API so we can
+        # store and display the real match date rather than the time we
+        # happened to record it.
+        match_date = None
+        utc_date_str = match.get('utcDate', '')
+        if utc_date_str:
+            try:
+                match_date = datetime.strptime(utc_date_str, '%Y-%m-%dT%H:%M:%SZ')
+            except (ValueError, TypeError):
+                match_date = None
         
         # Determine and set the round
         match_round = self._determine_round(match)
@@ -400,7 +434,7 @@ class MatchProcessor:
             if is_draw:
                 # For draws, winner/loser are team1/team2
                 # team1 is home, team2 is away
-                success, message = record_draw(winner, loser, home_score, away_score)
+                success, message = record_draw(winner, loser, home_score, away_score, match_date)
                 result_type = "draw"
             else:
                 # Determine winner and loser scores
@@ -408,7 +442,7 @@ class MatchProcessor:
                     winner_score, loser_score = home_score, away_score
                 else:
                     winner_score, loser_score = away_score, home_score
-                success, message = record_match(winner, loser, winner_score, loser_score)
+                success, message = record_match(winner, loser, winner_score, loser_score, match_date)
                 result_type = "win"
             
             if success:

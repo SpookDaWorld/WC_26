@@ -181,7 +181,8 @@ class Match(db.Model):
     # Match scores
     team1_score = db.Column(db.Integer, nullable=True)  # Goals scored by team1
     team2_score = db.Column(db.Integer, nullable=True)  # Goals scored by team2
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)  # When recorded (UTC)
+    match_date = db.Column(db.DateTime, nullable=True)  # Actual match kickoff (UTC, from API)
     
     team1 = db.relationship('Team', foreign_keys=[team1_id], backref='matches_as_team1')
     team2 = db.relationship('Team', foreign_keys=[team2_id], backref='matches_as_team2')
@@ -324,7 +325,7 @@ def initialize_teams():
     return len(merged_df)
 
 
-def record_match(winner_country, loser_country, winner_score=None, loser_score=None):
+def record_match(winner_country, loser_country, winner_score=None, loser_score=None, match_date=None):
     """Record a match result with optional score"""
     current_round = get_current_round()
     
@@ -403,7 +404,8 @@ def record_match(winner_country, loser_country, winner_score=None, loser_score=N
         winner_id=winner.id,
         points_earned=points_earned,
         team1_score=winner_score,
-        team2_score=loser_score
+        team2_score=loser_score,
+        match_date=match_date
     )
     db.session.add(match)
     db.session.commit()
@@ -432,7 +434,7 @@ def record_match(winner_country, loser_country, winner_score=None, loser_score=N
     return True, message
 
 
-def record_draw(team1_country, team2_country, team1_score=None, team2_score=None):
+def record_draw(team1_country, team2_country, team1_score=None, team2_score=None, match_date=None):
     """Record a draw (group stage only) with optional score"""
     current_round = get_current_round()
     
@@ -474,7 +476,8 @@ def record_draw(team1_country, team2_country, team1_score=None, team2_score=None
         team1_earned=team1_earns,
         team2_earned=team2_earns,
         team1_score=team1_score,
-        team2_score=team2_score
+        team2_score=team2_score,
+        match_date=match_date
     )
     db.session.add(match)
     db.session.commit()
@@ -1216,6 +1219,18 @@ def match_results():
             else:
                 home_score, away_score = 0, 0  # Draw, no score recorded
         
+        # Prefer the actual match kickoff time (match_date) when available;
+        # fall back to the recording timestamp for older records. Both are
+        # naive UTC, so convert to US Central for display.
+        display_dt = m.match_date if m.match_date else m.timestamp
+        if display_dt:
+            dt_central = display_dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(CENTRAL_TZ)
+            date_str = dt_central.strftime('%Y-%m-%d')
+            date_fmt = dt_central.strftime('%A, %B %d, %Y')
+            time_str = dt_central.strftime('%I:%M %p CT').lstrip('0')
+        else:
+            date_str = date_fmt = time_str = ''
+        
         match_data = {
             'id': m.id,
             'home_team': home_team,
@@ -1226,9 +1241,9 @@ def match_results():
             'away_score': away_score,
             'status': 'FINISHED',
             'stage': m.round_name,
-            'date': m.timestamp.strftime('%Y-%m-%d') if m.timestamp else '',
-            'date_formatted': m.timestamp.strftime('%A, %B %d, %Y') if m.timestamp else '',
-            'time': m.timestamp.strftime('%H:%M') if m.timestamp else '',
+            'date': date_str,
+            'date_formatted': date_fmt,
+            'time': time_str,
             'penalties': None
         }
         matches.append(match_data)
@@ -1726,6 +1741,13 @@ def check_and_migrate_db():
                         conn.execute(db.text('ALTER TABLE "match" ADD COLUMN team2_score INTEGER'))
                         conn.commit()
                     print("Added 'team2_score' column!")
+                
+                if 'match_date' not in match_columns:
+                    print("Adding 'match_date' column to match table...")
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE "match" ADD COLUMN match_date DATETIME'))
+                        conn.commit()
+                    print("Added 'match_date' column!")
                 
         except Exception as e:
             # Table might not exist yet, that's fine
