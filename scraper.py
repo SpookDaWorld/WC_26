@@ -72,6 +72,7 @@ TEAM_NAME_MAP = {
     'Türkiye': 'Türkiye',
     'Turkey': 'Türkiye',
     'Cape Verde': 'Cabo Verde',
+    'Cape Verde Islands': 'Cabo Verde',
     'Cabo Verde Islands': 'Cabo Verde',
     'Bosnia-Herzegovina': 'Bosnia & Herzegovina',
     'Bosnia and Herzegovina': 'Bosnia & Herzegovina',
@@ -860,6 +861,11 @@ class WorldCupScraper:
         """Run a single scrape cycle"""
         logger.info("Starting scrape cycle...")
         
+        # Proactively check for any API team names that don't map to a
+        # team in our database, so mismatches surface in the logs before
+        # they silently block a match from being recorded.
+        self.validate_team_names()
+        
         # Get all finished matches
         matches = self.client.get_finished_matches()
         
@@ -895,6 +901,72 @@ class WorldCupScraper:
                 logger.debug(f"Advancement check: {message}")
         
         return processed
+    
+    def validate_team_names(self):
+        """
+        Scan all known World Cup matches and warn about any API team name
+        that does not resolve (via normalize_team_name) to a team in our
+        database. This catches API-vs-database naming mismatches (e.g.
+        'Cape Verde Islands' vs 'Cabo Verde') early, before they silently
+        block a match from being recorded.
+
+        Returns the set of unmapped (API name, normalized name) pairs found.
+        """
+        try:
+            matches = self.client.get_matches()
+        except Exception as e:
+            logger.debug(f"Team name validation skipped (could not fetch matches): {e}")
+            return set()
+
+        if not matches:
+            return set()
+
+        # Collect every distinct API team name appearing in the schedule
+        api_names = set()
+        for m in matches:
+            home = m.get('homeTeam', {}).get('name')
+            away = m.get('awayTeam', {}).get('name')
+            if home:
+                api_names.add(home)
+            if away:
+                api_names.add(away)
+
+        # Knockout fixtures use placeholder names before teams are decided
+        # (e.g. "Winner Group A", "Runner-up Group B", "1A", "Match 73").
+        # Skip those so they don't generate false-positive warnings.
+        def is_placeholder(name: str) -> bool:
+            lowered = name.lower()
+            placeholder_markers = ['winner', 'runner', 'loser', 'group ', 'match ',
+                                   'tbd', 'third', '/', 'place ']
+            if any(marker in lowered for marker in placeholder_markers):
+                return True
+            # Short alphanumeric slot codes like "1A", "2B", "W73"
+            if len(name) <= 3 and any(ch.isdigit() for ch in name):
+                return True
+            return False
+
+        unmapped = set()
+        with app.app_context():
+            for api_name in sorted(api_names):
+                if is_placeholder(api_name):
+                    continue
+                normalized = normalize_team_name(api_name)
+                team = Team.query.filter_by(country=normalized).first()
+                if team is None:
+                    unmapped.add((api_name, normalized))
+
+        if unmapped:
+            logger.warning("=" * 60)
+            logger.warning(f"TEAM NAME MISMATCH(ES) DETECTED: {len(unmapped)} unmapped name(s)")
+            logger.warning("These API team names do not match any team in the database.")
+            logger.warning("Add a mapping in TEAM_NAME_MAP in scraper.py to fix:")
+            for api_name, normalized in sorted(unmapped):
+                logger.warning(f"  API: '{api_name}'  ->  normalized to: '{normalized}'  (NOT in database)")
+            logger.warning("=" * 60)
+        else:
+            logger.debug("Team name validation: all match team names map correctly.")
+
+        return unmapped
     
     def check_standings(self):
         """Manually check and display current standings"""
@@ -975,23 +1047,30 @@ def verify_team_mapping():
     
     if not data or 'teams' not in data:
         logger.error("Could not fetch teams from API")
-        return
+    else:
+        api_teams = [normalize_team_name(t['name']) for t in data['teams']]
+        
+        # Find mismatches
+        missing_in_api = set(db_teams) - set(api_teams)
+        missing_in_db = set(api_teams) - set(db_teams)
+        
+        if missing_in_api:
+            logger.warning(f"Teams in DB but not in API: {missing_in_api}")
+            logger.warning("Add these to TEAM_NAME_MAP in scraper.py")
+        
+        if missing_in_db:
+            logger.info(f"Teams in API but not in DB: {missing_in_db}")
+        
+        if not missing_in_api and not missing_in_db:
+            logger.info("✓ All team names from /teams endpoint match!")
     
-    api_teams = [normalize_team_name(t['name']) for t in data['teams']]
-    
-    # Find mismatches
-    missing_in_api = set(db_teams) - set(api_teams)
-    missing_in_db = set(api_teams) - set(db_teams)
-    
-    if missing_in_api:
-        logger.warning(f"Teams in DB but not in API: {missing_in_api}")
-        logger.warning("Add these to TEAM_NAME_MAP in scraper.py")
-    
-    if missing_in_db:
-        logger.info(f"Teams in API but not in DB: {missing_in_db}")
-    
-    if not missing_in_api and not missing_in_db:
-        logger.info("✓ All team names match!")
+    # Also check team names as they appear in actual match fixtures - this
+    # is where mismatches like 'Cape Verde Islands' actually show up.
+    logger.info("Checking team names in match fixtures...")
+    scraper = WorldCupScraper(API_KEY)
+    unmapped = scraper.validate_team_names()
+    if not unmapped:
+        logger.info("✓ All match fixture team names map correctly!")
 
 def show_upcoming_matches():
     """Display upcoming matches"""
