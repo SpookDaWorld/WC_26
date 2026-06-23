@@ -275,10 +275,20 @@
                 {% endif %}
             </div>
             
+            {% if selections %}
+            <div style="margin-bottom: 1rem; position: relative;">
+                <input type="text" id="entrySearch" class="form-input" placeholder="🔍 Search your name..."
+                       style="width: 100%;" autocomplete="off">
+                <div id="searchNoResults" style="display: none; color: var(--text-secondary); text-align: center; padding: 1rem; font-size: 0.9rem;">
+                    No entries match your search.
+                </div>
+            </div>
+            {% endif %}
+            
             <div class="leaderboard-scroll">
             {% if selections %}
                 {% for sel in selections %}
-                <div class="user-card {% if loop.index == 1 %}winner{% endif %}">
+                <div class="user-card {% if loop.index == 1 %}winner{% endif %}" data-username="{{ sel.user_name|lower }}" data-rank="{{ loop.index }}">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                         <div style="display: flex; align-items: center;">
                             <span class="user-rank">#{{ loop.index }}</span>
@@ -340,88 +350,119 @@
 
 {% block extra_js %}
 <script>
-    const teamOptions = document.querySelectorAll('.team-option');
-    const selectionCount = document.getElementById('selectionCount');
+    // ===== Entry search (works whether or not the selection form is shown) =====
+    const entrySearch = document.getElementById('entrySearch');
+    if (entrySearch) {
+        const userCards = document.querySelectorAll('.user-card');
+        const noResults = document.getElementById('searchNoResults');
+        
+        entrySearch.addEventListener('input', (e) => {
+            const query = e.target.value.trim().toLowerCase();
+            let visibleCount = 0;
+            
+            userCards.forEach(card => {
+                const name = card.dataset.username || '';
+                if (query === '' || name.includes(query)) {
+                    card.style.display = '';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            
+            if (noResults) {
+                noResults.style.display = (visibleCount === 0 && query !== '') ? 'block' : 'none';
+            }
+        });
+    }
+    
+    // ===== Selection form (only present before the tournament locks) =====
     const form = document.getElementById('selectionForm');
     const formMessage = document.getElementById('formMessage');
     
-    // Handle team selection
-    teamOptions.forEach(option => {
-        option.addEventListener('click', () => {
-            const checkbox = option.querySelector('input');
-            const currentCount = document.querySelectorAll('.team-option.selected').length;
-            
-            if (!checkbox.checked && currentCount >= 4) {
-                // Can't select more than 4
-                return;
-            }
-            
-            checkbox.checked = !checkbox.checked;
-            option.classList.toggle('selected', checkbox.checked);
-            
-            // Update count
-            const newCount = document.querySelectorAll('.team-option.selected').length;
-            selectionCount.textContent = newCount;
-        });
-    });
-    
-    // Filter out emojis and special characters from name input
-    const userNameInput = document.getElementById('userName');
-    userNameInput.addEventListener('input', (e) => {
-        // Only allow letters, numbers, spaces, hyphens, and underscores
-        e.target.value = e.target.value.replace(/[^A-Za-z0-9 _-]/g, '');
-    });
-    
-    // Handle form submission
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        let userName = document.getElementById('userName').value.trim();
-        // Final sanitization - remove any remaining non-allowed characters
-        userName = userName.replace(/[^A-Za-z0-9 _-]/g, '');
-        
-        const selectedTeams = Array.from(document.querySelectorAll('.team-option.selected'))
-            .map(opt => parseInt(opt.dataset.teamId));
-        
-        if (!userName) {
-            showMessage('Please enter your name (letters and numbers only)', 'error');
-            return;
-        }
-        
-        if (selectedTeams.length < 3 || selectedTeams.length > 4) {
-            showMessage('Please select 3-4 teams', 'error');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/create-selection', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    user_name: userName,
-                    team_ids: selectedTeams
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showMessage('Selection created successfully!', 'success');
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                showMessage(data.message, 'error');
-            }
-        } catch (error) {
-            showMessage('An error occurred. Please try again.', 'error');
-        }
-    });
-    
     function showMessage(text, type) {
+        if (!formMessage) return;
         formMessage.textContent = text;
         formMessage.className = `flash flash-${type}`;
         formMessage.style.display = 'block';
+    }
+    
+    if (form) {
+        const teamOptions = document.querySelectorAll('.team-option');
+        const selectionCount = document.getElementById('selectionCount');
+        
+        // Handle team selection
+        teamOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const checkbox = option.querySelector('input');
+                const currentCount = document.querySelectorAll('.team-option.selected').length;
+                
+                if (!checkbox.checked && currentCount >= 4) {
+                    // Can't select more than 4
+                    return;
+                }
+                
+                checkbox.checked = !checkbox.checked;
+                option.classList.toggle('selected', checkbox.checked);
+                
+                // Update count
+                const newCount = document.querySelectorAll('.team-option.selected').length;
+                selectionCount.textContent = newCount;
+            });
+        });
+        
+        // Filter out emojis and special characters from name input
+        const userNameInput = document.getElementById('userName');
+        userNameInput.addEventListener('input', (e) => {
+            // Only allow letters, numbers, spaces, hyphens, and underscores
+            e.target.value = e.target.value.replace(/[^A-Za-z0-9 _-]/g, '');
+        });
+        
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            let userName = document.getElementById('userName').value.trim();
+            // Final sanitization - remove any remaining non-allowed characters
+            userName = userName.replace(/[^A-Za-z0-9 _-]/g, '');
+            
+            const selectedTeams = Array.from(document.querySelectorAll('.team-option.selected'))
+                .map(opt => parseInt(opt.dataset.teamId));
+            
+            if (!userName) {
+                showMessage('Please enter your name (letters and numbers only)', 'error');
+                return;
+            }
+            
+            if (selectedTeams.length < 3 || selectedTeams.length > 4) {
+                showMessage('Please select 3-4 teams', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/create-selection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_name: userName,
+                        team_ids: selectedTeams
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Selection created successfully!', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('An error occurred. Please try again.', 'error');
+            }
+        });
     }
 </script>
 {% endblock %}

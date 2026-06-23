@@ -70,6 +70,86 @@
         max-height: 500px;
         overflow-y: auto;
     }
+    
+    .pick-row {
+        display: flex;
+        align-items: center;
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid var(--border);
+        gap: 0.75rem;
+    }
+    
+    .pick-row:last-child {
+        border-bottom: none;
+    }
+    
+    .pick-rank {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.3rem;
+        color: var(--accent-gold);
+        width: 1.75rem;
+        text-align: center;
+        flex-shrink: 0;
+    }
+    
+    .pick-team {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 0;
+    }
+    
+    .pick-team-name {
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .pick-team-name.eliminated {
+        color: var(--text-secondary);
+        text-decoration: line-through;
+        opacity: 0.7;
+    }
+    
+    .pick-count {
+        text-align: center;
+        flex-shrink: 0;
+    }
+    
+    .pick-count-num {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.5rem;
+        color: var(--accent);
+        line-height: 1;
+    }
+    
+    .pick-count-label {
+        font-size: 0.65rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+    
+    .pick-score {
+        text-align: right;
+        flex-shrink: 0;
+        min-width: 60px;
+    }
+    
+    .pick-score-num {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 1.5rem;
+        color: var(--accent-green);
+        line-height: 1;
+    }
+    
+    .pick-score-label {
+        font-size: 0.65rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
 </style>
 {% endblock %}
 
@@ -94,6 +174,73 @@
         </div>
     </div>
 </div>
+
+<!-- Pick Popularity Section -->
+{% if most_picked %}
+<div class="grid grid-2" style="margin-bottom: 1.5rem;">
+    <!-- Most Picked -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">🔥 Most Picked Teams</h3>
+            <span style="color: var(--text-secondary); font-size: 0.8rem;">{{ total_selections }} total entries</span>
+        </div>
+        <div>
+            {% for team in most_picked %}
+            <div class="pick-row">
+                <div class="pick-rank">{{ loop.index }}</div>
+                <div class="pick-team">
+                    {% if team.flag_code %}
+                    <img src="https://flagcdn.com/24x18/{{ team.flag_code }}.png"
+                         srcset="https://flagcdn.com/48x36/{{ team.flag_code }}.png 2x"
+                         class="flag" alt="{{ team.country }}">
+                    {% endif %}
+                    <span class="pick-team-name {% if team.eliminated %}eliminated{% endif %}">{{ team.country }}</span>
+                </div>
+                <div class="pick-count">
+                    <div class="pick-count-num">{{ team.pick_count }}</div>
+                    <div class="pick-count-label">{% if team.pick_count == 1 %}pick{% else %}picks{% endif %}</div>
+                </div>
+                <div class="pick-score">
+                    <div class="pick-score-num">{{ "%.1f"|format(team.total_score) }}</div>
+                    <div class="pick-score-label">pts</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Least Picked -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">❄️ Least Picked Teams</h3>
+            <span style="color: var(--text-secondary); font-size: 0.8rem;">includes unpicked</span>
+        </div>
+        <div>
+            {% for team in least_picked %}
+            <div class="pick-row">
+                <div class="pick-rank">{{ loop.index }}</div>
+                <div class="pick-team">
+                    {% if team.flag_code %}
+                    <img src="https://flagcdn.com/24x18/{{ team.flag_code }}.png"
+                         srcset="https://flagcdn.com/48x36/{{ team.flag_code }}.png 2x"
+                         class="flag" alt="{{ team.country }}">
+                    {% endif %}
+                    <span class="pick-team-name {% if team.eliminated %}eliminated{% endif %}">{{ team.country }}</span>
+                </div>
+                <div class="pick-count">
+                    <div class="pick-count-num">{{ team.pick_count }}</div>
+                    <div class="pick-count-label">{% if team.pick_count == 1 %}pick{% else %}picks{% endif %}</div>
+                </div>
+                <div class="pick-score">
+                    <div class="pick-score-num">{{ "%.1f"|format(team.total_score) }}</div>
+                    <div class="pick-score-label">pts</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <div class="grid grid-2">
     <!-- Score Distribution Chart -->

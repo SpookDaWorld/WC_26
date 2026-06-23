@@ -1374,10 +1374,54 @@ def statistics():
         'active': [s['active_teams'] for s in conf_stats]
     }
     
+    # Compute pick frequency across all user selections
+    pick_counts = {}  # team_id -> count
+    selections = UserTeamSelection.query.all()
+    for sel in selections:
+        if not sel.team_ids:
+            continue
+        try:
+            ids = json.loads(sel.team_ids)
+        except (ValueError, TypeError):
+            continue
+        for tid in ids:
+            pick_counts[tid] = pick_counts.get(tid, 0) + 1
+    
+    # Build a list of ALL teams with their pick details. Teams that were
+    # never picked get a pick_count of 0 so they can appear in the
+    # least-picked list.
+    all_team_picks = []
+    for team in Team.query.all():
+        all_team_picks.append({
+            'country': team.country,
+            'flag_code': team.flag_code,
+            'pick_count': pick_counts.get(team.id, 0),
+            'total_score': team.total_score,
+            'eliminated': team.eliminated,
+            'elimination_round': team.elimination_round
+        })
+    
+    # Most picked: sort by count desc, then score desc as tiebreaker.
+    # Only include teams that were picked at least once.
+    most_picked = sorted(
+        [t for t in all_team_picks if t['pick_count'] > 0],
+        key=lambda x: (x['pick_count'], x['total_score']),
+        reverse=True
+    )[:5]
+    
+    # Least picked: sort by count asc, then score asc as tiebreaker.
+    # Includes never-picked teams (pick_count == 0).
+    least_picked = sorted(all_team_picks, key=lambda x: (x['pick_count'], x['total_score']))[:5]
+    
+    total_selections = len(selections)
+    
     return render_template('statistics.html',
                           conf_stats=conf_stats,
                           score_distribution=score_distribution,
                           conf_chart=conf_chart,
+                          most_picked=most_picked,
+                          least_picked=least_picked,
+                          total_selections=total_selections,
                           current_round=get_current_round())
 
 
