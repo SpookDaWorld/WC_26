@@ -297,7 +297,11 @@
                              srcset="https://flagcdn.com/48x36/{{ match.home_flag }}.png 2x"
                              class="flag" alt="{{ match.home_team }}">
                         {% endif %}
+                        {% if match.home_team and match.home_flag %}
                         <a href="{{ url_for('team_detail', country=match.home_team) }}">{{ match.home_team }}</a>
+                        {% else %}
+                        <span>{{ match.home_team or 'TBD' }}</span>
+                        {% endif %}
                     </span>
                 </div>
                 
@@ -318,7 +322,11 @@
                              srcset="https://flagcdn.com/48x36/{{ match.away_flag }}.png 2x"
                              class="flag" alt="{{ match.away_team }}">
                         {% endif %}
+                        {% if match.away_team and match.away_flag %}
                         <a href="{{ url_for('team_detail', country=match.away_team) }}">{{ match.away_team }}</a>
+                        {% else %}
+                        <span>{{ match.away_team or 'TBD' }}</span>
+                        {% endif %}
                     </span>
                 </div>
             </div>

@@ -833,8 +833,10 @@ def get_live_matches_data():
 
         live_matches = []
         for m in live:
-            home_name = normalize_team_name(m['homeTeam']['name'])
-            away_name = normalize_team_name(m['awayTeam']['name'])
+            raw_home = m.get('homeTeam', {}).get('name')
+            raw_away = m.get('awayTeam', {}).get('name')
+            home_name = normalize_team_name(raw_home) if raw_home else (raw_home or 'TBD')
+            away_name = normalize_team_name(raw_away) if raw_away else (raw_away or 'TBD')
 
             home_team = Team.query.filter_by(country=home_name).first()
             away_team = Team.query.filter_by(country=away_name).first()
@@ -920,8 +922,13 @@ def get_upcoming_matches_data(days_ahead=21, limit=30):
             if status not in ('SCHEDULED', 'TIMED'):
                 continue
 
-            home_name = normalize_team_name(m['homeTeam']['name'])
-            away_name = normalize_team_name(m['awayTeam']['name'])
+            # Knockout fixtures may not have teams decided yet - the API
+            # returns a null name. Fall back to the raw API name (e.g. a
+            # placeholder) or 'TBD' so we never pass None to url_for.
+            raw_home = m.get('homeTeam', {}).get('name')
+            raw_away = m.get('awayTeam', {}).get('name')
+            home_name = normalize_team_name(raw_home) if raw_home else (raw_home or 'TBD')
+            away_name = normalize_team_name(raw_away) if raw_away else (raw_away or 'TBD')
 
             home_team = Team.query.filter_by(country=home_name).first()
             away_team = Team.query.filter_by(country=away_name).first()
@@ -1034,8 +1041,10 @@ def get_todays_matches_data():
 
             status = m.get('status')
 
-            home_name = normalize_team_name(m['homeTeam']['name'])
-            away_name = normalize_team_name(m['awayTeam']['name'])
+            raw_home = m.get('homeTeam', {}).get('name')
+            raw_away = m.get('awayTeam', {}).get('name')
+            home_name = normalize_team_name(raw_home) if raw_home else (raw_home or 'TBD')
+            away_name = normalize_team_name(raw_away) if raw_away else (raw_away or 'TBD')
 
             home_team = Team.query.filter_by(country=home_name).first()
             away_team = Team.query.filter_by(country=away_name).first()
