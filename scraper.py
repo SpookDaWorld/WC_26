@@ -650,10 +650,16 @@ class StandingsProcessor:
         groups = self.get_group_standings()
         
         if not groups:
+            logger.warning("Advancement halted: get_group_standings() returned no groups. "
+                           "Check /api/debug-standings - the API standings response shape "
+                           "may not match the parser's stage/type/group filters.")
             return False, "Failed to fetch standings from API"
+        
+        logger.info(f"Parsed {len(groups)} group(s) from standings")
         
         # Check if all groups are complete
         if not self.check_group_stage_complete(groups):
+            logger.info("Advancement halted: group stage not yet complete per standings.")
             return False, "Group stage not yet complete"
         
         # Determine advancing teams

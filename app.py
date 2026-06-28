@@ -1185,6 +1185,160 @@ def debug_live_matches():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/debug-group-stage')
+@admin_required
+def debug_group_stage():
+    """
+    Admin-only diagnostic. Compares the API's finished GROUP_STAGE matches
+    against what's recorded in our database, and lists exactly which
+    matches are missing and why (e.g. team name not found in DB).
+
+    This is the key tool for figuring out why automatic advancement to the
+    knockout stage hasn't fired: it requires all 72 group matches recorded.
+    """
+    api_key = os.environ.get('FOOTBALL_DATA_API_KEY', '')
+    if not api_key or api_key == 'YOUR_API_KEY_HERE':
+        return jsonify({'success': False, 'error': 'FOOTBALL_DATA_API_KEY not configured'}), 500
+
+    try:
+        from scraper import FootballDataClient, normalize_team_name
+
+        client = FootballDataClient(api_key)
+
+        # All matches from the API
+        all_api = client.get_matches()
+        if all_api is None:
+            return jsonify({'success': False, 'error': 'API request failed'}), 502
+
+        # Filter to finished group-stage matches
+        api_group_finished = [
+            m for m in all_api
+            if m.get('stage') == 'GROUP_STAGE' and m.get('status') == 'FINISHED'
+        ]
+
+        recorded_count = Match.query.filter_by(round_name="Group Stage").count()
+
+        missing = []
+        unmapped_names = set()
+        for m in api_group_finished:
+            home_api = (m.get('homeTeam') or {}).get('name')
+            away_api = (m.get('awayTeam') or {}).get('name')
+            home_norm = normalize_team_name(home_api) if home_api else None
+            away_norm = normalize_team_name(away_api) if away_api else None
+
+            home_obj = Team.query.filter_by(country=home_norm).first() if home_norm else None
+            away_obj = Team.query.filter_by(country=away_norm).first() if away_norm else None
+
+            # Is this match already in our DB?
+            existing = None
+            if home_obj and away_obj:
+                existing = Match.query.filter(
+                    Match.round_name == "Group Stage",
+                    db.or_(
+                        db.and_(Match.team1_id == home_obj.id, Match.team2_id == away_obj.id),
+                        db.and_(Match.team1_id == away_obj.id, Match.team2_id == home_obj.id),
+                    )
+                ).first()
+
+            if existing is None:
+                reason = []
+                if not home_obj:
+                    reason.append(f"home '{home_api}' -> '{home_norm}' NOT in DB")
+                    if home_norm:
+                        unmapped_names.add((home_api, home_norm))
+                if not away_obj:
+                    reason.append(f"away '{away_api}' -> '{away_norm}' NOT in DB")
+                    if away_norm:
+                        unmapped_names.add((away_api, away_norm))
+                if home_obj and away_obj:
+                    reason.append("teams OK but match not recorded (likely pending retry)")
+
+                missing.append({
+                    'id': m.get('id'),
+                    'utcDate': m.get('utcDate'),
+                    'home': home_api,
+                    'away': away_api,
+                    'score': (m.get('score') or {}).get('fullTime'),
+                    'reason': '; '.join(reason)
+                })
+
+        return jsonify({
+            'success': True,
+            'api_finished_group_matches': len(api_group_finished),
+            'recorded_group_matches_in_db': recorded_count,
+            'target_for_advancement': 72,
+            'missing_count': len(missing),
+            'missing_matches': missing,
+            'unmapped_team_names': sorted([f"'{a}' -> '{n}'" for a, n in unmapped_names]),
+            'note': 'Add unmapped names to TEAM_NAME_MAP in scraper.py, then matches record on the next scrape cycle.'
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/debug-standings')
+@admin_required
+def debug_standings():
+    """
+    Admin-only diagnostic for the group->knockout auto-advancement.
+
+    Dumps the raw standings response shape from the API and shows how our
+    parser interprets it, so we can see why automatic advancement may not
+    be firing even when all 72 group matches are recorded. The advancement
+    code requires get_group_standings() to return 12 fully-played groups.
+    """
+    api_key = os.environ.get('FOOTBALL_DATA_API_KEY', '')
+    if not api_key or api_key == 'YOUR_API_KEY_HERE':
+        return jsonify({'success': False, 'error': 'FOOTBALL_DATA_API_KEY not configured'}), 500
+
+    try:
+        from scraper import FootballDataClient, StandingsProcessor
+
+        client = FootballDataClient(api_key)
+        raw = client.get_standings()
+
+        if not raw:
+            return jsonify({'success': False, 'error': 'Standings API request returned nothing'}), 502
+
+        # Summarize the raw shape: list each standings block's stage/type/group
+        raw_blocks = []
+        for s in raw.get('standings', []):
+            raw_blocks.append({
+                'stage': s.get('stage'),
+                'type': s.get('type'),
+                'group': s.get('group'),
+                'table_rows': len(s.get('table', []))
+            })
+
+        # Now run our actual parser and report what it produced
+        sp = StandingsProcessor(client)
+        parsed_groups = sp.get_group_standings()
+
+        parsed_summary = {}
+        if parsed_groups:
+            for g, teams in parsed_groups.items():
+                parsed_summary[g] = [
+                    {'name': t['name'], 'pos': t['position'], 'played': t['playedGames'], 'pts': t['points']}
+                    for t in teams
+                ]
+
+        is_complete = sp.check_group_stage_complete(parsed_groups) if parsed_groups else False
+
+        return jsonify({
+            'success': True,
+            'raw_standings_block_count': len(raw.get('standings', [])),
+            'raw_blocks': raw_blocks,
+            'parsed_group_count': len(parsed_groups) if parsed_groups else 0,
+            'parsed_groups': parsed_summary,
+            'check_group_stage_complete_result': is_complete,
+            'note': 'If parsed_group_count is 0 but raw_blocks has data, the stage/type/group filters in get_group_standings() do not match the API response shape shown in raw_blocks.'
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/results')
 def match_results():
     """Match results page - shows live scores and completed matches"""
