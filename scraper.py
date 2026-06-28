@@ -505,18 +505,27 @@ class StandingsProcessor:
         groups = {}
         
         for standing in data['standings']:
-            # Only process group stage standings
-            if standing.get('stage') != 'GROUP_STAGE':
-                continue
+            # The API returns group-stage tables with type 'TOTAL' and a
+            # group label like 'Group A'. The 'stage' field is 'ALL' (not
+            # 'GROUP_STAGE'), so we key off the presence of a group label
+            # plus type == 'TOTAL' rather than filtering on stage.
             if standing.get('type') != 'TOTAL':
                 continue
             
-            group_name = standing.get('group', '')
-            # Extract group letter (e.g., 'GROUP_A' -> 'A')
-            if group_name.startswith('GROUP_'):
-                group_letter = group_name.replace('GROUP_', '')
-            else:
-                group_letter = group_name
+            group_name = standing.get('group')
+            if not group_name:
+                # No group label -> not a group-stage table (e.g. a
+                # knockout bracket standing); skip it.
+                continue
+            
+            # Extract the group letter from any of these formats:
+            #   'Group A', 'GROUP_A', 'Group_A', 'A'
+            group_letter = (group_name
+                            .replace('GROUP_', '')
+                            .replace('Group_', '')
+                            .replace('Group ', '')
+                            .replace('GROUP ', '')
+                            .strip())
             
             table = standing.get('table', [])
             teams_in_group = []
