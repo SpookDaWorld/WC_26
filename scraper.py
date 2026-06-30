@@ -258,16 +258,18 @@ class MatchProcessor:
         Returns:
             Tuple of (winner_name, loser_name, is_draw)
             For draws: (team1_name, team2_name, True)
+            If the result can't be safely determined: (None, None, False)
 
-        Notes on this API's actual data shape (observed in production):
-          - 'duration' tells us how the match was decided: 'REGULAR',
-            'EXTRA_TIME', or 'PENALTY_SHOOTOUT'.
-          - 'fullTime' is the AGGREGATE result and is the most reliable
-            field. For a shootout it already includes the shootout outcome
-            (e.g. regulationTime 1-1 -> fullTime 4-5 reflects the winner).
-          - The 'penalties' sub-object and 'winner' field can be unreliable
-            / incomplete (e.g. penalties showing 4-4 and winner None on a
-            decided shootout), so we do NOT depend on them to pick a winner.
+        IMPORTANT - this API is inconsistent for penalty shootouts:
+          - Sometimes 'fullTime' is the AGGREGATE incl. the shootout
+            (e.g. regulation 1-1 -> fullTime 4-5), which IS decisive.
+          - Sometimes 'fullTime' is just the regulation score (tied), and
+            the 'penalties' sub-object / 'winner' field are unreliable
+            (wrong values, swapped, or null).
+        Because auto-recording the WRONG winner (eliminating the wrong
+        team) is far worse than deferring, for shootouts we only
+        auto-decide when the evidence is internally consistent. Otherwise
+        we defer and ask for manual entry.
         """
         home_team = normalize_team_name(match['homeTeam']['name'])
         away_team = normalize_team_name(match['awayTeam']['name'])
@@ -281,68 +283,81 @@ class MatchProcessor:
         penalties = score.get('penalties') or {}
         winner_field = score.get('winner')
 
-        # ---- 1. fullTime aggregate: the most reliable decisive signal. --
-        # On this API, fullTime reflects the final outcome including any
-        # extra time and penalty shootout, so a non-tied fullTime is
-        # authoritative for the winner.
-        if full_time.get('home') is not None and full_time.get('away') is not None:
-            fh, fa = full_time['home'], full_time['away']
-            if fh > fa:
-                return home_team, away_team, False
-            elif fa > fh:
-                return away_team, home_team, False
-            # fullTime is tied - fall through to the tie-breakers below.
+        ft_h, ft_a = full_time.get('home'), full_time.get('away')
+        rt_h, rt_a = regular_time.get('home'), regular_time.get('away')
+        pen_h, pen_a = penalties.get('home'), penalties.get('away')
 
-        # ---- 2. Penalty shootout: use the penalties sub-object if it has
-        #         a decisive result.
-        if penalties.get('home') is not None and penalties.get('away') is not None:
-            ph, pa = penalties['home'], penalties['away']
-            if ph > pa:
-                return home_team, away_team, False
-            elif pa > ph:
-                return away_team, home_team, False
+        # ================= PENALTY SHOOTOUT =================
+        if duration == 'PENALTY_SHOOTOUT':
+            # Collect every independent signal of who won, then require
+            # them to agree before auto-recording.
+            votes = []  # 'HOME' or 'AWAY' from each available signal
 
-        # ---- 3. Explicit winner field (overall winner incl. ET/pens). ---
+            # Signal A: fullTime as aggregate (only meaningful if it differs
+            # from regulation, i.e. it actually includes the shootout).
+            if ft_h is not None and ft_a is not None and ft_h != ft_a:
+                votes.append(('fullTime', 'HOME' if ft_h > ft_a else 'AWAY'))
+
+            # Signal B: penalties sub-object (if decisive).
+            if pen_h is not None and pen_a is not None and pen_h != pen_a:
+                votes.append(('penalties', 'HOME' if pen_h > pen_a else 'AWAY'))
+
+            # Signal C: explicit winner field.
+            if winner_field == 'HOME_TEAM':
+                votes.append(('winner', 'HOME'))
+            elif winner_field == 'AWAY_TEAM':
+                votes.append(('winner', 'AWAY'))
+
+            distinct = set(v for _, v in votes)
+            if len(votes) >= 1 and len(distinct) == 1:
+                # All available signals agree - safe to record.
+                side = distinct.pop()
+                if side == 'HOME':
+                    return home_team, away_team, False
+                else:
+                    return away_team, home_team, False
+
+            # Signals conflict or are absent - DO NOT guess. Defer and ask
+            # for manual entry so we never eliminate the wrong team.
+            logger.warning(
+                f"PENALTY SHOOTOUT for match {match['id']} "
+                f"({home_team} vs {away_team}) has conflicting/insufficient "
+                f"data - NOT auto-recording. Please enter this result manually "
+                f"via the admin Record Match page. Signals={votes}. Raw score={score}"
+            )
+            return None, None, False
+
+        # ================= NON-SHOOTOUT =================
+        # Decisive by extra time / full time / regulation. fullTime here is
+        # the on-pitch result (regulation or ET), which is reliable.
+        for block in (extra_time, full_time, regular_time):
+            bh, ba = block.get('home'), block.get('away')
+            if bh is not None and ba is not None:
+                if bh > ba:
+                    return home_team, away_team, False
+                elif ba > bh:
+                    return away_team, home_team, False
+                break  # tied on the first usable block; resolve below
+
+        # Explicit winner field (covers odd cases).
         if winner_field == 'HOME_TEAM':
             return home_team, away_team, False
         elif winner_field == 'AWAY_TEAM':
             return away_team, home_team, False
-
-        # ---- 4. Extra time / regulation numeric scores. -----------------
-        for block in (extra_time, full_time, regular_time):
-            if block.get('home') is not None and block.get('away') is not None:
-                h, a = block['home'], block['away']
-                if h > a:
-                    return home_team, away_team, False
-                elif a > h:
-                    return away_team, home_team, False
-                break  # tied on the first usable block; stop and resolve below
-
-        # ---- 5. Resolve a tie. ------------------------------------------
-        # A shootout that we couldn't resolve above means the data is
-        # incomplete - defer for retry rather than mis-recording.
-        if duration == 'PENALTY_SHOOTOUT':
-            logger.warning(
-                f"Match {match['id']} ({home_team} vs {away_team}) is a penalty "
-                f"shootout but no decisive score could be read - deferring for retry. "
-                f"Raw score: {score}"
-            )
-            return None, None, False
-
         if winner_field == 'DRAW':
             return home_team, away_team, True
 
-        # In a knockout round a genuine tie shouldn't happen; defer for retry.
-        # In the group stage, a tie is a legitimate draw.
+        # Tied with no winner signal. Group stage -> legitimate draw.
         current_round = get_current_round()
         if current_round == "Group Stage":
-            # Only call it a draw if we actually saw a tied numeric score.
-            if (full_time.get('home') is not None and full_time.get('away') is not None) or \
-               (regular_time.get('home') is not None and regular_time.get('away') is not None):
+            if (ft_h is not None and ft_a is not None) or (rt_h is not None and rt_a is not None):
                 return home_team, away_team, True
 
+        # Knockout tie with no usable data -> defer for retry.
         logger.warning(f"No decisive result for match {match['id']} "
                        f"({home_team} vs {away_team}, status={match.get('status')}, duration={duration})")
+        logger.warning(f"Raw score data: {score}")
+        return None, None, False
         logger.warning(f"Raw score data: {score}")
         return None, None, False
     
@@ -390,6 +405,17 @@ class MatchProcessor:
         if winner is None:
             logger.warning(f"Could not determine result for match {match_id}")
             return False
+        
+        # Log the full raw score for any shootout/ET match so we have a
+        # permanent record of the exact data shape we decided from.
+        _dbg_score = match.get('score', {}) or {}
+        _dbg_duration = (_dbg_score.get('duration') or '').upper()
+        if _dbg_duration in ('PENALTY_SHOOTOUT', 'EXTRA_TIME'):
+            logger.info(f"[result-debug] match {match_id} "
+                        f"{normalize_team_name(match['homeTeam']['name'])}(home) vs "
+                        f"{normalize_team_name(match['awayTeam']['name'])}(away) | "
+                        f"duration={_dbg_duration} | winner_decided={winner} | "
+                        f"raw_score={_dbg_score}")
         
         # Extract scores for display. Prefer the score that reflects how
         # the match was ultimately decided in regulation/extra time:
