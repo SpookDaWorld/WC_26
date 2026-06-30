@@ -264,51 +264,67 @@ class MatchProcessor:
         
         score = match.get('score', {}) or {}
         
-        # Get the final score (handle extra time and penalties)
-        # Priority: penalties > extraTime > fullTime > regularTime
-        # NOTE: use explicit "is not None" checks (not truthiness) so a
-        # legitimate 0 score is never treated as "missing".
+        # ---- 1. Penalty shootout: the most decisive signal. -------------
+        # If a shootout happened, its winner is the match winner regardless
+        # of the on-pitch score. Check this FIRST.
+        pens = score.get('penalties') or {}
+        if pens.get('home') is not None and pens.get('away') is not None:
+            if pens['home'] > pens['away']:
+                return home_team, away_team, False
+            elif pens['away'] > pens['home']:
+                return away_team, home_team, False
+        
+        # ---- 2. Explicit winner field. ----------------------------------
+        # The API reports the overall winner (including ET/penalties) here.
+        # Trust it for a decisive (non-draw) result.
+        winner_field = score.get('winner')
+        if winner_field == 'HOME_TEAM':
+            return home_team, away_team, False
+        elif winner_field == 'AWAY_TEAM':
+            return away_team, home_team, False
+        
+        # ---- 3. Numeric scores (extra time first, then regulation). -----
+        # Priority: extraTime > fullTime > regularTime. Use explicit
+        # "is not None" checks so a legitimate 0 is never treated as missing.
         final_score = None
-        for score_type in ['penalties', 'extraTime', 'fullTime', 'regularTime']:
+        for score_type in ['extraTime', 'fullTime', 'regularTime']:
             block = score.get(score_type) or {}
             if block.get('home') is not None and block.get('away') is not None:
                 final_score = block
                 break
         
-        # Determine the result type using the score we found.
         if final_score is not None:
             home_goals = final_score['home']
             away_goals = final_score['away']
             
             if home_goals > away_goals:
-                return home_team, away_team, False  # Home team wins
+                return home_team, away_team, False
             elif away_goals > home_goals:
-                return away_team, home_team, False  # Away team wins
+                return away_team, home_team, False
             
-            # Tied on this score block - check for a penalty shootout winner
-            pens = score.get('penalties') or {}
-            if pens.get('home') is not None and pens.get('away') is not None:
-                if pens['home'] > pens['away']:
-                    return home_team, away_team, False
-                elif pens['away'] > pens['home']:
-                    return away_team, home_team, False
+            # Tied on the pitch with no shootout and no explicit winner.
+            if winner_field == 'DRAW':
+                return home_team, away_team, True
             
-            # Genuinely tied with no shootout -> draw (valid in group stage)
-            return home_team, away_team, True
+            # In a knockout round a tie is impossible without ET/pens having
+            # been recorded; treat as data lag and retry rather than mis-record
+            # it as a draw. In the group stage, a tie is a legitimate draw.
+            current_round = get_current_round()
+            if current_round == "Group Stage":
+                return home_team, away_team, True
+            else:
+                logger.warning(
+                    f"Knockout match {match['id']} ({home_team} vs {away_team}) is tied "
+                    f"on score with no penalty/winner data yet - deferring for retry. "
+                    f"Raw score: {score}"
+                )
+                return None, None, False
         
-        # No usable numeric score found. Fall back to the API's explicit
-        # "winner" field if present, so we can still classify the result
-        # (e.g. a confirmed DRAW) even when score sub-objects are sparse.
-        winner_field = score.get('winner')
+        # ---- 4. No numeric score, but explicit DRAW. --------------------
         if winner_field == 'DRAW':
             return home_team, away_team, True
-        elif winner_field == 'HOME_TEAM':
-            return home_team, away_team, False
-        elif winner_field == 'AWAY_TEAM':
-            return away_team, home_team, False
         
-        # Truly nothing to go on yet (likely data lag right after FT) -
-        # return None so the match is retried on the next cycle.
+        # ---- 5. Nothing usable yet (data lag). Retry next cycle. --------
         logger.warning(f"No score found for match {match['id']} ({home_team} vs {away_team}, status={match.get('status')})")
         logger.warning(f"Raw score data: {score}")
         return None, None, False
@@ -376,6 +392,12 @@ class MatchProcessor:
             home_score = 0 if home_score is None else home_score
             away_score = 0 if away_score is None else away_score
         
+        # Extract penalty shootout scores (if any) - tracked separately
+        # so they can be displayed alongside the regulation/ET score.
+        pens_block = score.get('penalties') or {}
+        home_pens = pens_block.get('home')
+        away_pens = pens_block.get('away')
+        
         # Get team names for determining which score belongs to which team
         home_team = normalize_team_name(match['homeTeam']['name'])
         away_team = normalize_team_name(match['awayTeam']['name'])
@@ -438,12 +460,15 @@ class MatchProcessor:
                 success, message = record_draw(winner, loser, home_score, away_score, match_date)
                 result_type = "draw"
             else:
-                # Determine winner and loser scores
+                # Determine winner and loser scores (and penalty scores)
                 if winner == home_team:
                     winner_score, loser_score = home_score, away_score
+                    winner_pens, loser_pens = home_pens, away_pens
                 else:
                     winner_score, loser_score = away_score, home_score
-                success, message = record_match(winner, loser, winner_score, loser_score, match_date)
+                    winner_pens, loser_pens = away_pens, home_pens
+                success, message = record_match(winner, loser, winner_score, loser_score,
+                                                match_date, winner_pens, loser_pens)
                 result_type = "win"
             
             if success:

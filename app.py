@@ -181,6 +181,8 @@ class Match(db.Model):
     # Match scores
     team1_score = db.Column(db.Integer, nullable=True)  # Goals scored by team1
     team2_score = db.Column(db.Integer, nullable=True)  # Goals scored by team2
+    team1_pens = db.Column(db.Integer, nullable=True)  # Penalty shootout goals, team1
+    team2_pens = db.Column(db.Integer, nullable=True)  # Penalty shootout goals, team2
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)  # When recorded (UTC)
     match_date = db.Column(db.DateTime, nullable=True)  # Actual match kickoff (UTC, from API)
     
@@ -190,9 +192,12 @@ class Match(db.Model):
     
     @property
     def score_display(self):
-        """Return formatted score string like '2-1' or None if no score"""
+        """Return formatted score string like '2-1' or '1-1 (4-2 pen)' or None"""
         if self.team1_score is not None and self.team2_score is not None:
-            return f"{self.team1_score}-{self.team2_score}"
+            base = f"{self.team1_score}-{self.team2_score}"
+            if self.team1_pens is not None and self.team2_pens is not None:
+                base += f" ({self.team1_pens}-{self.team2_pens} pen)"
+            return base
         return None
 
 class TournamentState(db.Model):
@@ -325,7 +330,7 @@ def initialize_teams():
     return len(merged_df)
 
 
-def record_match(winner_country, loser_country, winner_score=None, loser_score=None, match_date=None):
+def record_match(winner_country, loser_country, winner_score=None, loser_score=None, match_date=None, winner_pens=None, loser_pens=None):
     """Record a match result with optional score"""
     current_round = get_current_round()
     
@@ -405,6 +410,8 @@ def record_match(winner_country, loser_country, winner_score=None, loser_score=N
         points_earned=points_earned,
         team1_score=winner_score,
         team2_score=loser_score,
+        team1_pens=winner_pens,
+        team2_pens=loser_pens,
         match_date=match_date
     )
     db.session.add(match)
@@ -1339,6 +1346,55 @@ def debug_standings():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/debug-match-scores')
+@admin_required
+def debug_match_scores():
+    """
+    Admin-only diagnostic. Dumps the raw 'score' object for all finished
+    knockout (non-group-stage) matches, so we can see the exact structure
+    the API uses for extra time and penalty shootouts. This is used to fix
+    detection of penalty/ET winners.
+    """
+    api_key = os.environ.get('FOOTBALL_DATA_API_KEY', '')
+    if not api_key or api_key == 'YOUR_API_KEY_HERE':
+        return jsonify({'success': False, 'error': 'FOOTBALL_DATA_API_KEY not configured'}), 500
+
+    try:
+        from scraper import FootballDataClient
+
+        client = FootballDataClient(api_key)
+        all_api = client.get_matches()
+        if all_api is None:
+            return jsonify({'success': False, 'error': 'API request failed'}), 502
+
+        knockout = []
+        for m in all_api:
+            stage = m.get('stage', '')
+            status = m.get('status')
+            # Skip group stage; we want knockout matches
+            if stage == 'GROUP_STAGE':
+                continue
+            if status != 'FINISHED':
+                continue
+            knockout.append({
+                'id': m.get('id'),
+                'stage': stage,
+                'status': status,
+                'home': (m.get('homeTeam') or {}).get('name'),
+                'away': (m.get('awayTeam') or {}).get('name'),
+                'raw_score': m.get('score'),  # full raw score object
+            })
+
+        return jsonify({
+            'success': True,
+            'finished_knockout_count': len(knockout),
+            'matches': knockout
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/results')
 def match_results():
     """Match results page - shows live scores and completed matches"""
@@ -1955,6 +2011,20 @@ def check_and_migrate_db():
                         conn.execute(db.text('ALTER TABLE "match" ADD COLUMN match_date DATETIME'))
                         conn.commit()
                     print("Added 'match_date' column!")
+                
+                if 'team1_pens' not in match_columns:
+                    print("Adding 'team1_pens' column to match table...")
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE "match" ADD COLUMN team1_pens INTEGER'))
+                        conn.commit()
+                    print("Added 'team1_pens' column!")
+                
+                if 'team2_pens' not in match_columns:
+                    print("Adding 'team2_pens' column to match table...")
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE "match" ADD COLUMN team2_pens INTEGER'))
+                        conn.commit()
+                    print("Added 'team2_pens' column!")
                 
         except Exception as e:
             # Table might not exist yet, that's fine
