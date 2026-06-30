@@ -38,6 +38,26 @@
                 </select>
             </div>
             
+            <div class="form-group">
+                <label class="form-label">Score <span style="color: var(--text-secondary); font-size: 0.8rem;">(optional — regulation/ET score)</span></label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="number" name="winner_score" class="form-input" placeholder="Winner" min="0" style="width: 100%;">
+                    <span style="color: var(--text-secondary);">—</span>
+                    <input type="number" name="loser_score" class="form-input" placeholder="Loser" min="0" style="width: 100%;">
+                </div>
+            </div>
+            
+            {% if not is_group_stage %}
+            <div class="form-group">
+                <label class="form-label">Penalty Shootout <span style="color: var(--text-secondary); font-size: 0.8rem;">(optional — only if decided on penalties)</span></label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="number" name="winner_pens" class="form-input" placeholder="Winner pens" min="0" style="width: 100%;">
+                    <span style="color: var(--text-secondary);">—</span>
+                    <input type="number" name="loser_pens" class="form-input" placeholder="Loser pens" min="0" style="width: 100%;">
+                </div>
+            </div>
+            {% endif %}
+            
             <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
                 Record Win
             </button>
@@ -85,6 +105,15 @@
                     <option value="{{ team.country }}">{{ team.country }} ({{ "%.1f"|format(team.current_points) }} pts)</option>
                     {% endfor %}
                 </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Score <span style="color: var(--text-secondary); font-size: 0.8rem;">(optional)</span></label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="number" name="team1_score" class="form-input" placeholder="Team 1" min="0" style="width: 100%;">
+                    <span style="color: var(--text-secondary);">—</span>
+                    <input type="number" name="team2_score" class="form-input" placeholder="Team 2" min="0" style="width: 100%;">
+                </div>
             </div>
             
             <button type="submit" class="btn btn-secondary" style="width: 100%; justify-content: center;">

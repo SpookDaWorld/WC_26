@@ -1498,24 +1498,48 @@ def record_match_view():
     if request.method == 'POST':
         match_type = request.form.get('match_type')
         
+        def _to_int(val):
+            """Parse an optional integer form field; return None if blank."""
+            if val is None or str(val).strip() == '':
+                return None
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return None
+        
         if match_type == 'win':
             winner = request.form.get('winner')
             loser = request.form.get('loser')
             
+            winner_score = _to_int(request.form.get('winner_score'))
+            loser_score = _to_int(request.form.get('loser_score'))
+            winner_pens = _to_int(request.form.get('winner_pens'))
+            loser_pens = _to_int(request.form.get('loser_pens'))
+            
             if winner == loser:
                 flash('Winner and loser must be different teams', 'error')
             else:
-                success, message = record_match(winner, loser)
+                success, message = record_match(
+                    winner, loser,
+                    winner_score=winner_score, loser_score=loser_score,
+                    winner_pens=winner_pens, loser_pens=loser_pens
+                )
                 flash(message, 'success' if success else 'error')
         
         elif match_type == 'draw':
             team1 = request.form.get('team1')
             team2 = request.form.get('team2')
             
+            team1_score = _to_int(request.form.get('team1_score'))
+            team2_score = _to_int(request.form.get('team2_score'))
+            
             if team1 == team2:
                 flash('Teams must be different', 'error')
             else:
-                success, message = record_draw(team1, team2)
+                success, message = record_draw(
+                    team1, team2,
+                    team1_score=team1_score, team2_score=team2_score
+                )
                 flash(message, 'success' if success else 'error')
         
         return redirect(url_for('record_match_view'))
