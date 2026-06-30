@@ -253,79 +253,96 @@ class MatchProcessor:
     
     def _get_match_result(self, match: dict) -> Tuple[Optional[str], Optional[str], bool]:
         """
-        Extract match result from API data
-        
+        Extract match result from API data.
+
         Returns:
             Tuple of (winner_name, loser_name, is_draw)
             For draws: (team1_name, team2_name, True)
+
+        Notes on this API's actual data shape (observed in production):
+          - 'duration' tells us how the match was decided: 'REGULAR',
+            'EXTRA_TIME', or 'PENALTY_SHOOTOUT'.
+          - 'fullTime' is the AGGREGATE result and is the most reliable
+            field. For a shootout it already includes the shootout outcome
+            (e.g. regulationTime 1-1 -> fullTime 4-5 reflects the winner).
+          - The 'penalties' sub-object and 'winner' field can be unreliable
+            / incomplete (e.g. penalties showing 4-4 and winner None on a
+            decided shootout), so we do NOT depend on them to pick a winner.
         """
         home_team = normalize_team_name(match['homeTeam']['name'])
         away_team = normalize_team_name(match['awayTeam']['name'])
-        
+
         score = match.get('score', {}) or {}
-        
-        # ---- 1. Penalty shootout: the most decisive signal. -------------
-        # If a shootout happened, its winner is the match winner regardless
-        # of the on-pitch score. Check this FIRST.
-        pens = score.get('penalties') or {}
-        if pens.get('home') is not None and pens.get('away') is not None:
-            if pens['home'] > pens['away']:
-                return home_team, away_team, False
-            elif pens['away'] > pens['home']:
-                return away_team, home_team, False
-        
-        # ---- 2. Explicit winner field. ----------------------------------
-        # The API reports the overall winner (including ET/penalties) here.
-        # Trust it for a decisive (non-draw) result.
+        duration = (score.get('duration') or '').upper()
+
+        full_time = score.get('fullTime') or {}
+        regular_time = score.get('regularTime') or {}
+        extra_time = score.get('extraTime') or {}
+        penalties = score.get('penalties') or {}
         winner_field = score.get('winner')
+
+        # ---- 1. fullTime aggregate: the most reliable decisive signal. --
+        # On this API, fullTime reflects the final outcome including any
+        # extra time and penalty shootout, so a non-tied fullTime is
+        # authoritative for the winner.
+        if full_time.get('home') is not None and full_time.get('away') is not None:
+            fh, fa = full_time['home'], full_time['away']
+            if fh > fa:
+                return home_team, away_team, False
+            elif fa > fh:
+                return away_team, home_team, False
+            # fullTime is tied - fall through to the tie-breakers below.
+
+        # ---- 2. Penalty shootout: use the penalties sub-object if it has
+        #         a decisive result.
+        if penalties.get('home') is not None and penalties.get('away') is not None:
+            ph, pa = penalties['home'], penalties['away']
+            if ph > pa:
+                return home_team, away_team, False
+            elif pa > ph:
+                return away_team, home_team, False
+
+        # ---- 3. Explicit winner field (overall winner incl. ET/pens). ---
         if winner_field == 'HOME_TEAM':
             return home_team, away_team, False
         elif winner_field == 'AWAY_TEAM':
             return away_team, home_team, False
-        
-        # ---- 3. Numeric scores (extra time first, then regulation). -----
-        # Priority: extraTime > fullTime > regularTime. Use explicit
-        # "is not None" checks so a legitimate 0 is never treated as missing.
-        final_score = None
-        for score_type in ['extraTime', 'fullTime', 'regularTime']:
-            block = score.get(score_type) or {}
+
+        # ---- 4. Extra time / regulation numeric scores. -----------------
+        for block in (extra_time, full_time, regular_time):
             if block.get('home') is not None and block.get('away') is not None:
-                final_score = block
-                break
-        
-        if final_score is not None:
-            home_goals = final_score['home']
-            away_goals = final_score['away']
-            
-            if home_goals > away_goals:
-                return home_team, away_team, False
-            elif away_goals > home_goals:
-                return away_team, home_team, False
-            
-            # Tied on the pitch with no shootout and no explicit winner.
-            if winner_field == 'DRAW':
-                return home_team, away_team, True
-            
-            # In a knockout round a tie is impossible without ET/pens having
-            # been recorded; treat as data lag and retry rather than mis-record
-            # it as a draw. In the group stage, a tie is a legitimate draw.
-            current_round = get_current_round()
-            if current_round == "Group Stage":
-                return home_team, away_team, True
-            else:
-                logger.warning(
-                    f"Knockout match {match['id']} ({home_team} vs {away_team}) is tied "
-                    f"on score with no penalty/winner data yet - deferring for retry. "
-                    f"Raw score: {score}"
-                )
-                return None, None, False
-        
-        # ---- 4. No numeric score, but explicit DRAW. --------------------
+                h, a = block['home'], block['away']
+                if h > a:
+                    return home_team, away_team, False
+                elif a > h:
+                    return away_team, home_team, False
+                break  # tied on the first usable block; stop and resolve below
+
+        # ---- 5. Resolve a tie. ------------------------------------------
+        # A shootout that we couldn't resolve above means the data is
+        # incomplete - defer for retry rather than mis-recording.
+        if duration == 'PENALTY_SHOOTOUT':
+            logger.warning(
+                f"Match {match['id']} ({home_team} vs {away_team}) is a penalty "
+                f"shootout but no decisive score could be read - deferring for retry. "
+                f"Raw score: {score}"
+            )
+            return None, None, False
+
         if winner_field == 'DRAW':
             return home_team, away_team, True
-        
-        # ---- 5. Nothing usable yet (data lag). Retry next cycle. --------
-        logger.warning(f"No score found for match {match['id']} ({home_team} vs {away_team}, status={match.get('status')})")
+
+        # In a knockout round a genuine tie shouldn't happen; defer for retry.
+        # In the group stage, a tie is a legitimate draw.
+        current_round = get_current_round()
+        if current_round == "Group Stage":
+            # Only call it a draw if we actually saw a tied numeric score.
+            if (full_time.get('home') is not None and full_time.get('away') is not None) or \
+               (regular_time.get('home') is not None and regular_time.get('away') is not None):
+                return home_team, away_team, True
+
+        logger.warning(f"No decisive result for match {match['id']} "
+                       f"({home_team} vs {away_team}, status={match.get('status')}, duration={duration})")
         logger.warning(f"Raw score data: {score}")
         return None, None, False
     
@@ -378,25 +395,70 @@ class MatchProcessor:
         # the match was ultimately decided in regulation/extra time:
         # fullTime (includes ET on this API) > regularTime > extraTime.
         # Penalty shootout scores are tracked separately, not as the headline.
+        # Extract the headline score and any penalty shootout score.
+        #
+        # On this API:
+        #   - regularTime / extraTime hold the on-pitch score.
+        #   - fullTime is the AGGREGATE (for a shootout it bakes in the
+        #     winner, e.g. regulation 1-1 -> fullTime 4-5).
+        #   - The 'penalties' sub-object is sometimes unreliable (e.g. 4-4
+        #     on a decided shootout).
+        #
+        # For display we want the on-pitch result as the headline (e.g.
+        # "1-1") plus the actual shootout score. We derive the shootout
+        # score from fullTime minus the pre-shootout score when needed.
         score = match.get('score', {}) or {}
+        duration = (score.get('duration') or '').upper()
+        full_time = score.get('fullTime') or {}
+        regular_time = score.get('regularTime') or {}
+        extra_time = score.get('extraTime') or {}
+        pens_block = score.get('penalties') or {}
+
+        # Pre-shootout on-pitch score: prefer the score at the end of play.
+        # If extra time was played and is non-zero use the combined
+        # regulation+ET; otherwise use regulation; otherwise fall back to
+        # fullTime.
+        def _combined(a, b):
+            if a.get('home') is not None and b.get('home') is not None:
+                return a['home'] + b['home'], a['away'] + b['away']
+            return None, None
+
         home_score = away_score = None
-        for score_type in ['fullTime', 'regularTime', 'extraTime']:
-            block = score.get(score_type) or {}
-            if block.get('home') is not None and block.get('away') is not None:
-                home_score = block['home']
-                away_score = block['away']
-                break
-        
+        is_shootout = (duration == 'PENALTY_SHOOTOUT') or (
+            pens_block.get('home') is not None and pens_block.get('away') is not None
+        )
+
+        if regular_time.get('home') is not None:
+            # On-pitch score at the end of extra time (regulation + ET).
+            if extra_time.get('home') is not None and (extra_time.get('home') or extra_time.get('away')):
+                home_score, away_score = _combined(regular_time, extra_time)
+            else:
+                home_score, away_score = regular_time['home'], regular_time['away']
+        elif full_time.get('home') is not None and not is_shootout:
+            home_score, away_score = full_time['home'], full_time['away']
+
         # Last-resort default so we never store/display None
         if home_score is None or away_score is None:
             home_score = 0 if home_score is None else home_score
             away_score = 0 if away_score is None else away_score
-        
-        # Extract penalty shootout scores (if any) - tracked separately
-        # so they can be displayed alongside the regulation/ET score.
-        pens_block = score.get('penalties') or {}
-        home_pens = pens_block.get('home')
-        away_pens = pens_block.get('away')
+
+        # Determine the penalty shootout score.
+        home_pens = away_pens = None
+        if is_shootout:
+            ph, pa = pens_block.get('home'), pens_block.get('away')
+            # If the penalties sub-object is decisive, trust it.
+            if ph is not None and pa is not None and ph != pa:
+                home_pens, away_pens = ph, pa
+            else:
+                # Otherwise derive the shootout score from the fullTime
+                # aggregate minus the pre-shootout on-pitch score.
+                if full_time.get('home') is not None and full_time.get('away') is not None:
+                    derived_h = full_time['home'] - home_score
+                    derived_a = full_time['away'] - away_score
+                    if derived_h >= 0 and derived_a >= 0 and (derived_h or derived_a):
+                        home_pens, away_pens = derived_h, derived_a
+                    elif ph is not None and pa is not None:
+                        home_pens, away_pens = ph, pa
         
         # Get team names for determining which score belongs to which team
         home_team = normalize_team_name(match['homeTeam']['name'])
